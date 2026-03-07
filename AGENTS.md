@@ -76,7 +76,7 @@ Rule #1: If you want exception to ANY rule, YOU MUST STOP and get explicit permi
 
 ### Preflight 1: Feature Branch Creation (BEFORE implementing plan)
 
-- ALWAYS use `dev` as the base branch for preflight sync (do not infer from `origin/HEAD`).
+- ALWAYS use `main` as the base branch for preflight sync (do not infer from `origin/HEAD`).
 - ALWAYS update the base branch using fetch + fast-forward-only. If sync fails, STOP and ask Ori.
 - ALWAYS create a feature branch using `type/scope-topic` naming.
 - ALWAYS use `git worktree` by default. A normal branch checkout is allowed only when work is single-threaded or worktree setup is blocked.
