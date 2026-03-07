@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "cgpt-virtualizer",
+  "version": "0.1.0",
+  "description": "ChatGPT 트랜스크립트 가상화 익스텐션",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "cgpt-virtualizer"
+  },
+  "background": {
+    "service_worker": "worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["tabs", "activeTab", "storage"]
+}
