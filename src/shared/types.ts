@@ -1,6 +1,8 @@
 export const RUNTIME_STATUS_VALUES = ['On', 'Off', 'Unavailable'] as const
+export const CONTENT_AVAILABILITY_VALUES = ['idle', 'available', 'unavailable'] as const
 
 export type RuntimeStatus = (typeof RUNTIME_STATUS_VALUES)[number]
+export type ContentAvailability = (typeof CONTENT_AVAILABILITY_VALUES)[number]
 export type PopupStatus = RuntimeStatus
 export type RuntimeAvailability = Extract<RuntimeStatus, 'On' | 'Unavailable'>
 export type TranscriptSessionId = string

@@ -1,8 +1,10 @@
-import type { PopupState } from './types.ts'
+import type { ContentAvailability, PopupState } from './types.ts'
 
 export const GET_POPUP_STATE_MESSAGE_TYPE = 'runtime/get-popup-state' as const
 export const SET_TAB_ENABLED_MESSAGE_TYPE = 'runtime/set-tab-enabled' as const
 export const POPUP_STATE_MESSAGE_TYPE = 'runtime/popup-state' as const
+export const REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE =
+  'runtime/report-content-availability' as const
 
 export interface GetPopupStateMessage {
   type: typeof GET_POPUP_STATE_MESSAGE_TYPE
@@ -17,7 +19,13 @@ export interface PopupStateMessage extends PopupState {
   type: typeof POPUP_STATE_MESSAGE_TYPE
 }
 
+export interface ReportContentAvailabilityMessage {
+  availability: ContentAvailability
+  type: typeof REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE
+}
+
 export type PopupToWorkerMessage = GetPopupStateMessage | SetTabEnabledMessage
+export type ContentToWorkerMessage = ReportContentAvailabilityMessage
 export type WorkerToPopupMessage = PopupStateMessage
 
 export function createGetPopupStateMessage(): GetPopupStateMessage {
@@ -44,6 +52,15 @@ export function createPopupStateMessage(
   }
 }
 
+export function createReportContentAvailabilityMessage(
+  availability: ContentAvailability,
+): ReportContentAvailabilityMessage {
+  return {
+    availability,
+    type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+  }
+}
+
 export function isPopupToWorkerMessage(value: unknown): value is PopupToWorkerMessage {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -62,6 +79,26 @@ export function isPopupToWorkerMessage(value: unknown): value is PopupToWorkerMe
   }
 
   return typeof value.enabled === 'boolean'
+}
+
+export function isContentToWorkerMessage(value: unknown): value is ContentToWorkerMessage {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  if (!('type' in value) || value.type !== REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE) {
+    return false
+  }
+
+  if (!('availability' in value)) {
+    return false
+  }
+
+  return (
+    value.availability === 'idle' ||
+    value.availability === 'available' ||
+    value.availability === 'unavailable'
+  )
 }
 
 export function isWorkerToPopupMessage(value: unknown): value is WorkerToPopupMessage {

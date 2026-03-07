@@ -67,24 +67,24 @@
 
 ## 3. Content-script bootstrap and availability
 
-- [ ] Add content-script bootstrap
-- [ ] Check pathname against transcript route parser
-- [ ] Add centralized selector registry for:
-  - [ ] scroll container
-  - [ ] transcript root
-  - [ ] transcript bubbles
-  - [ ] streaming indicator
-- [ ] Resolve availability state:
-  - [ ] non-transcript route => idle
-  - [ ] transcript route + selector failure => `Unavailable`
-  - [ ] transcript route + selector success => available
-- [ ] Wire availability reporting into popup/worker flow
-- [ ] Add integration tests for bootstrap availability states
+- [x] Add content-script bootstrap
+- [x] Check pathname against transcript route parser
+- [x] Add centralized selector registry for:
+  - [x] scroll container
+  - [x] transcript root
+  - [x] transcript bubbles
+  - [x] streaming indicator
+- [x] Resolve availability state:
+  - [x] non-transcript route => idle
+  - [x] transcript route + selector failure => `Unavailable`
+  - [x] transcript route + selector success => available
+- [x] Wire availability reporting into popup/worker flow
+- [x] Add integration tests for bootstrap availability states
 
 ### Acceptance criteria
-- [ ] Selector failure reports `Unavailable`
-- [ ] Non-transcript routes do not activate
-- [ ] Transcript route can reach available state
+- [x] Selector failure reports `Unavailable`
+- [x] Non-transcript routes do not activate
+- [x] Transcript route can reach available state
 
 ---
 

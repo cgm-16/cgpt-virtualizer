@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
   GET_POPUP_STATE_MESSAGE_TYPE,
   POPUP_STATE_MESSAGE_TYPE,
   SET_TAB_ENABLED_MESSAGE_TYPE,
   createGetPopupStateMessage,
   createPopupStateMessage,
+  createReportContentAvailabilityMessage,
   createSetTabEnabledMessage,
+  isContentToWorkerMessage,
   isPopupToWorkerMessage,
 } from '../../src/shared/messages.ts'
 import { handlePopupMessage } from '../../src/background/popup-controller.ts'
@@ -35,6 +38,13 @@ describe('popup-worker message contracts', () => {
     })
   })
 
+  it('creates the content availability report message', () => {
+    expect(createReportContentAvailabilityMessage('available')).toEqual({
+      availability: 'available',
+      type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+    })
+  })
+
   it('recognizes valid popup-to-worker messages', () => {
     expect(isPopupToWorkerMessage({ type: GET_POPUP_STATE_MESSAGE_TYPE })).toBe(true)
     expect(
@@ -56,6 +66,41 @@ describe('popup-worker message contracts', () => {
     expect(isPopupToWorkerMessage({ type: 'runtime/unknown' })).toBe(false)
     expect(isPopupToWorkerMessage(null)).toBe(false)
   })
+
+  it('recognizes valid content-to-worker messages', () => {
+    expect(
+      isContentToWorkerMessage({
+        availability: 'idle',
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(true)
+    expect(
+      isContentToWorkerMessage({
+        availability: 'available',
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(true)
+    expect(
+      isContentToWorkerMessage({
+        availability: 'unavailable',
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects malformed content-to-worker messages', () => {
+    expect(
+      isContentToWorkerMessage({
+        availability: 'broken',
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(false)
+    expect(
+      isContentToWorkerMessage({
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(false)
+  })
 })
 
 describe('tab state store', () => {
@@ -63,7 +108,7 @@ describe('tab state store', () => {
     const store = createTabStateStore()
 
     expect(store.getTabPreference(7)).toBe(false)
-    expect(createPopupState(7, store.getTabPreference(7))).toEqual({
+    expect(createPopupState(7, store.getTabPreference(7), store.getTabAvailability(7))).toEqual({
       enabled: false,
       status: 'Off',
     })
@@ -74,18 +119,33 @@ describe('tab state store', () => {
 
     store.setTabPreference(7, true)
     store.setTabPreference(9, false)
+    store.setTabAvailability(7, 'available')
 
     expect(store.getTabPreference(7)).toBe(true)
     expect(store.getTabPreference(9)).toBe(false)
-    expect(createPopupState(7, store.getTabPreference(7))).toEqual({
+    expect(createPopupState(7, store.getTabPreference(7), store.getTabAvailability(7))).toEqual({
       enabled: true,
       status: 'On',
     })
   })
 
   it('marks missing active tabs as unavailable', () => {
-    expect(createPopupState(null, false)).toEqual({
+    expect(createPopupState(null, false, 'idle')).toEqual({
       enabled: false,
+      status: 'Unavailable',
+    })
+  })
+
+  it('maps idle availability to off even when the tab preference is on', () => {
+    expect(createPopupState(7, true, 'idle')).toEqual({
+      enabled: true,
+      status: 'Off',
+    })
+  })
+
+  it('maps selector failures to unavailable', () => {
+    expect(createPopupState(7, true, 'unavailable')).toEqual({
+      enabled: true,
       status: 'Unavailable',
     })
   })
@@ -111,6 +171,7 @@ describe('popup controller', () => {
   it('stores the updated preference and refreshes the active tab', async () => {
     const refreshedTabIds: number[] = []
     const store = createTabStateStore()
+    store.setTabAvailability(7, 'available')
 
     await expect(
       handlePopupMessage(createSetTabEnabledMessage(true), {
@@ -150,6 +211,23 @@ describe('popup controller', () => {
 
     expect(store.getTabPreference(7)).toBe(true)
     expect(refreshedTabIds).toEqual([])
+  })
+
+  it('returns unavailable when the active transcript page reports selector failure', async () => {
+    const store = createTabStateStore([[7, true]])
+    store.setTabAvailability(7, 'unavailable')
+
+    await expect(
+      handlePopupMessage(createGetPopupStateMessage(), {
+        getActiveTabId: async () => 7,
+        refreshActiveTab: async () => {},
+        tabStateStore: store,
+      }),
+    ).resolves.toEqual({
+      enabled: true,
+      status: 'Unavailable',
+      type: POPUP_STATE_MESSAGE_TYPE,
+    })
   })
 })
 
