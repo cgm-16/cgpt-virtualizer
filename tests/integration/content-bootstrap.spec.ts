@@ -131,6 +131,11 @@ async function installFixtureRoutes(page: Page): Promise<void> {
     if (url.pathname.startsWith('/dist/')) {
       const assetPath = normalize(join(DIST_DIRECTORY, url.pathname.replace('/dist/', '')))
 
+      if (!assetPath.startsWith(DIST_DIRECTORY)) {
+        await route.fulfill({ body: 'forbidden', status: 403 })
+        return
+      }
+
       try {
         const asset = await readFile(assetPath)
         await route.fulfill({
