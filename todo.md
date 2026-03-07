@@ -48,20 +48,20 @@
 
 ## 2. Popup and service worker
 
-- [ ] Implement popup UI with:
-  - [ ] On/Off toggle
-  - [ ] short status line
-- [ ] Implement service worker per-tab state keyed by `tabId`
-- [ ] Implement popup -> worker query for current tab state
-- [ ] Implement popup -> worker toggle update flow
-- [ ] Implement page refresh when toggling On/Off
-- [ ] Handle missing active-tab case safely
-- [ ] Add tests for worker state logic
+- [x] Implement popup UI with:
+  - [x] On/Off toggle
+  - [x] short status line
+- [x] Implement service worker per-tab state keyed by `tabId`
+- [x] Implement popup -> worker query for current tab state
+- [x] Implement popup -> worker toggle update flow
+- [x] Implement page refresh when toggling On/Off
+- [x] Handle missing active-tab case safely
+- [x] Add tests for worker state logic
 
 ### Acceptance criteria
-- [ ] Toggle state updates for active tab
-- [ ] Toggling refreshes the page
-- [ ] Popup can show `On`, `Off`, or `Unavailable`
+- [x] Toggle state updates for active tab
+- [x] Toggling refreshes the page
+- [x] Popup can show `On`, `Off`, or `Unavailable`
 
 ---
 
