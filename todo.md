@@ -10,19 +10,19 @@
 
 ## 0. Project setup
 
-- [ ] Create MV3 extension scaffold
-- [ ] Add TypeScript build pipeline
-- [ ] Add unit test runner
-- [ ] Add integration/browser test runner
-- [ ] Add pnpm scripts for build / test / watch
-- [ ] Add minimal popup, service worker, and content-script entries
-- [ ] Verify extension loads in Chrome
-- [ ] Verify test harness runs cleanly
+- [x] Create MV3 extension scaffold
+- [x] Add TypeScript build pipeline
+- [x] Add unit test runner
+- [x] Add integration/browser test runner
+- [x] Add pnpm scripts for build / test / watch
+- [x] Add minimal popup, service worker, and content-script entries
+- [x] Verify extension loads in Chrome
+- [x] Verify test harness runs cleanly
 
 ### Acceptance criteria
-- [ ] `pnpm run build` succeeds
-- [ ] `pnpm run test` succeeds
-- [ ] Extension can be loaded unpacked in Chrome
+- [x] `pnpm run build` succeeds
+- [x] `pnpm run test` succeeds
+- [x] Extension can be loaded unpacked in Chrome
 
 ---
 
