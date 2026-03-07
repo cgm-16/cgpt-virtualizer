@@ -1,12 +1,19 @@
 import {
+  isContentToWorkerMessage,
   isPopupToWorkerMessage,
 } from './shared/messages.ts'
+import { handleContentMessage } from './background/content-controller.ts'
 import { handlePopupMessage } from './background/popup-controller.ts'
 import { createTabStateStore } from './background/tab-state.ts'
 
 const tabStateStore = createTabStateStore()
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
+  if (isContentToWorkerMessage(message)) {
+    handleContentMessage(message, sender.tab?.id ?? null, tabStateStore)
+    return false
+  }
+
   if (!isPopupToWorkerMessage(message)) {
     return false
   }

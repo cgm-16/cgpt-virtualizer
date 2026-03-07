@@ -25,7 +25,9 @@ export async function handlePopupMessage(
 
   const enabled =
     activeTabId === null ? false : dependencies.tabStateStore.getTabPreference(activeTabId)
-  const popupState = createPopupState(activeTabId, enabled)
+  const availability =
+    activeTabId === null ? 'idle' : dependencies.tabStateStore.getTabAvailability(activeTabId)
+  const popupState = createPopupState(activeTabId, enabled, availability)
 
   return createPopupStateMessage(popupState.enabled, popupState.status)
 }

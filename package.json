@@ -8,6 +8,7 @@
     "watch": "vite build --watch",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "vitest run",
+    "pretest:integration": "pnpm run build",
     "test:integration": "playwright test"
   },
   "devDependencies": {

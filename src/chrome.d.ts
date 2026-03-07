@@ -2,7 +2,9 @@ interface ChromeLastError {
   message?: string
 }
 
-interface ChromeRuntimeMessageSender {}
+interface ChromeRuntimeMessageSender {
+  tab?: ChromeTab
+}
 
 interface ChromeRuntimeOnMessage {
   addListener(
@@ -17,7 +19,7 @@ interface ChromeRuntimeOnMessage {
 interface ChromeRuntimeApi {
   lastError: ChromeLastError | undefined
   onMessage: ChromeRuntimeOnMessage
-  sendMessage(message: unknown, callback: (response: unknown) => void): void
+  sendMessage(message: unknown, callback?: (response: unknown) => void): void
 }
 
 interface ChromeTab {
