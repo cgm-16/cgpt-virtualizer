@@ -28,21 +28,21 @@
 
 ## 1. Shared contracts and constants
 
-- [ ] Define shared message contracts between popup, worker, and content script
-- [ ] Add shared runtime status types (`On`, `Off`, `Unavailable`)
-- [ ] Add transcript session identifier types
-- [ ] Add constants:
-  - [ ] activation threshold = 50 bubbles
-  - [ ] append quiet period = 150 ms
-  - [ ] near-bottom threshold = 200 px
-- [ ] Add pathname parser for supported transcript routes
-- [ ] Add conversation ID extraction from pathname
-- [ ] Add unit tests for route matching and conversation ID parsing
+- [x] Define shared message contracts between popup, worker, and content script
+- [x] Add shared runtime status types (`On`, `Off`, `Unavailable`)
+- [x] Add transcript session identifier types
+- [x] Add constants:
+  - [x] activation threshold = 50 bubbles
+  - [x] append quiet period = 150 ms
+  - [x] near-bottom threshold = 200 px
+- [x] Add pathname parser for supported transcript routes
+- [x] Add conversation ID extraction from pathname
+- [x] Add unit tests for route matching and conversation ID parsing
 
 ### Acceptance criteria
-- [ ] Valid transcript paths parse correctly
-- [ ] Invalid paths are rejected
-- [ ] Shared contracts are used by at least popup + worker
+- [x] Valid transcript paths parse correctly
+- [x] Invalid paths are rejected
+- [x] Shared contracts are used by at least popup + worker
 
 ---
 
