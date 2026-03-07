@@ -1,5 +1,6 @@
 import {
   createGetPopupStateMessage,
+  createPopupStateMessage,
   createSetTabEnabledMessage,
   isWorkerToPopupMessage,
   type PopupToWorkerMessage,
@@ -45,11 +46,7 @@ function renderPopupState(message: WorkerToPopupMessage): void {
 }
 
 function renderUnavailableState(): void {
-  renderPopupState({
-    enabled: false,
-    status: 'Unavailable',
-    type: 'runtime/popup-state',
-  })
+  renderPopupState(createPopupStateMessage(false, 'Unavailable'))
 }
 
 function sendPopupMessage(message: PopupToWorkerMessage): Promise<WorkerToPopupMessage> {
