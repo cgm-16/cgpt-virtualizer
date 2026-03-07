@@ -1,18 +1,38 @@
 import {
-  createGetTabStatusMessage,
-  createTabStatusMessage,
-  type PopupToWorkerMessage,
-  type WorkerToPopupMessage,
+  isPopupToWorkerMessage,
 } from './shared/messages.ts'
-import { createRuntimeStatus } from './shared/types.ts'
+import { handlePopupMessage } from './background/popup-controller.ts'
+import { createTabStateStore } from './background/tab-state.ts'
 
-const bootstrapRequest: PopupToWorkerMessage = createGetTabStatusMessage()
-const bootstrapResponse: WorkerToPopupMessage = createTabStatusMessage(
-  createRuntimeStatus('Off'),
-)
+const tabStateStore = createTabStateStore()
 
-// 서비스 워커 진입점
-console.log('cgpt-virtualizer worker loaded', {
-  bootstrapRequest,
-  bootstrapResponse,
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if (!isPopupToWorkerMessage(message)) {
+    return false
+  }
+
+  void handlePopupMessage(message, {
+    getActiveTabId,
+    refreshActiveTab,
+    tabStateStore,
+  }).then(sendResponse)
+
+  return true
 })
+
+function getActiveTabId(): Promise<number | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const activeTabId = tabs[0]?.id
+      resolve(typeof activeTabId === 'number' ? activeTabId : null)
+    })
+  })
+}
+
+function refreshActiveTab(tabId: number): Promise<void> {
+  return new Promise((resolve) => {
+    chrome.tabs.reload(tabId, () => {
+      resolve()
+    })
+  })
+}

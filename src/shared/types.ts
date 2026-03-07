@@ -5,6 +5,11 @@ export type PopupStatus = RuntimeStatus
 export type RuntimeAvailability = Extract<RuntimeStatus, 'On' | 'Unavailable'>
 export type TranscriptSessionId = string
 
+export interface PopupState {
+  enabled: boolean
+  status: PopupStatus
+}
+
 export interface TranscriptPathMatch {
   conversationId: TranscriptSessionId
   pathname: string

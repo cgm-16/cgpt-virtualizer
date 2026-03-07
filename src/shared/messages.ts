@@ -1,35 +1,46 @@
-import type { RuntimeStatus, TranscriptSessionId } from './types.ts'
+import type { PopupState } from './types.ts'
 
-export const GET_TAB_STATUS_MESSAGE_TYPE = 'runtime/get-tab-status' as const
-export const TAB_STATUS_MESSAGE_TYPE = 'runtime/tab-status' as const
+export const GET_POPUP_STATE_MESSAGE_TYPE = 'runtime/get-popup-state' as const
+export const SET_TAB_ENABLED_MESSAGE_TYPE = 'runtime/set-tab-enabled' as const
+export const POPUP_STATE_MESSAGE_TYPE = 'runtime/popup-state' as const
 
-export interface GetTabStatusMessage {
-  type: typeof GET_TAB_STATUS_MESSAGE_TYPE
+export interface GetPopupStateMessage {
+  type: typeof GET_POPUP_STATE_MESSAGE_TYPE
 }
 
-export interface TabStatusMessage {
-  conversationId: TranscriptSessionId | null
-  status: RuntimeStatus
-  type: typeof TAB_STATUS_MESSAGE_TYPE
+export interface SetTabEnabledMessage {
+  enabled: boolean
+  type: typeof SET_TAB_ENABLED_MESSAGE_TYPE
 }
 
-export type PopupToWorkerMessage = GetTabStatusMessage
-export type WorkerToPopupMessage = TabStatusMessage
+export interface PopupStateMessage extends PopupState {
+  type: typeof POPUP_STATE_MESSAGE_TYPE
+}
 
-export function createGetTabStatusMessage(): GetTabStatusMessage {
+export type PopupToWorkerMessage = GetPopupStateMessage | SetTabEnabledMessage
+export type WorkerToPopupMessage = PopupStateMessage
+
+export function createGetPopupStateMessage(): GetPopupStateMessage {
   return {
-    type: GET_TAB_STATUS_MESSAGE_TYPE,
+    type: GET_POPUP_STATE_MESSAGE_TYPE,
   }
 }
 
-export function createTabStatusMessage(
-  status: RuntimeStatus,
-  conversationId: TranscriptSessionId | null = null,
-): TabStatusMessage {
+export function createSetTabEnabledMessage(enabled: boolean): SetTabEnabledMessage {
   return {
-    conversationId,
+    enabled,
+    type: SET_TAB_ENABLED_MESSAGE_TYPE,
+  }
+}
+
+export function createPopupStateMessage(
+  enabled: boolean,
+  status: PopupState['status'],
+): PopupStateMessage {
+  return {
+    enabled,
     status,
-    type: TAB_STATUS_MESSAGE_TYPE,
+    type: POPUP_STATE_MESSAGE_TYPE,
   }
 }
 
@@ -38,5 +49,37 @@ export function isPopupToWorkerMessage(value: unknown): value is PopupToWorkerMe
     return false
   }
 
-  return 'type' in value && value.type === GET_TAB_STATUS_MESSAGE_TYPE
+  if (!('type' in value)) {
+    return false
+  }
+
+  if (value.type === GET_POPUP_STATE_MESSAGE_TYPE) {
+    return true
+  }
+
+  if (value.type !== SET_TAB_ENABLED_MESSAGE_TYPE || !('enabled' in value)) {
+    return false
+  }
+
+  return typeof value.enabled === 'boolean'
+}
+
+export function isWorkerToPopupMessage(value: unknown): value is WorkerToPopupMessage {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  if (!('type' in value) || value.type !== POPUP_STATE_MESSAGE_TYPE) {
+    return false
+  }
+
+  if (!('enabled' in value) || typeof value.enabled !== 'boolean') {
+    return false
+  }
+
+  if (!('status' in value)) {
+    return false
+  }
+
+  return value.status === 'On' || value.status === 'Off' || value.status === 'Unavailable'
 }
