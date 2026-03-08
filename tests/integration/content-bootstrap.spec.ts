@@ -52,6 +52,54 @@ test('지원 경로에서 필수 선택자가 있으면 available을 보고한�
     ])
 })
 
+test('bubble이 0개일 때 available을 보고하고 오류 없이 실행된다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-0?fixture=bubble-0')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (window as typeof window & { __reportedMessages: unknown[] }).__reportedMessages),
+    )
+    .toEqual([
+      {
+        availability: 'available',
+        type: 'runtime/report-content-availability',
+      },
+    ])
+})
+
+test('bubble이 49개일 때 available을 보고하고 오류 없이 실행된다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-49?fixture=bubble-49')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (window as typeof window & { __reportedMessages: unknown[] }).__reportedMessages),
+    )
+    .toEqual([
+      {
+        availability: 'available',
+        type: 'runtime/report-content-availability',
+      },
+    ])
+})
+
+test('bubble이 50개일 때 available을 보고하고 오류 없이 실행된다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (window as typeof window & { __reportedMessages: unknown[] }).__reportedMessages),
+    )
+    .toEqual([
+      {
+        availability: 'available',
+        type: 'runtime/report-content-availability',
+      },
+    ])
+})
+
 function renderFixtureHtml(requestPath: string): string {
   const url = new URL(`http://fixture${requestPath}`)
   const fixture = url.searchParams.get('fixture')
@@ -91,6 +139,10 @@ function renderFixtureHtml(requestPath: string): string {
 </html>`
 }
 
+function renderBubbles(count: number): string {
+  return Array.from({ length: count }, () => '<article data-cgpt-transcript-bubble>Bubble</article>').join('\n          ')
+}
+
 function renderFixtureBody(fixture: string | null): string {
   if (fixture === 'available') {
     return `
@@ -106,6 +158,18 @@ function renderFixtureBody(fixture: string | null): string {
   if (fixture === 'missing') {
     return `
       <main data-cgpt-scroll-container></main>
+    `
+  }
+
+  if (fixture === 'bubble-0' || fixture === 'bubble-49' || fixture === 'bubble-50') {
+    const count = fixture === 'bubble-0' ? 0 : fixture === 'bubble-49' ? 49 : 50
+    return `
+      <main data-cgpt-scroll-container>
+        <section data-cgpt-transcript-root>
+          ${renderBubbles(count)}
+        </section>
+      </main>
+      <div data-cgpt-streaming-indicator hidden></div>
     `
   }
 
