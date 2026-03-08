@@ -20,6 +20,7 @@ export interface SchedulePatchOptions {
 }
 
 export interface ScrollVirtualizationController {
+  disconnect(): void
   schedulePatch(options?: SchedulePatchOptions): boolean
 }
 
@@ -32,11 +33,16 @@ export function initializeScrollVirtualization(
   state: TranscriptSessionState,
   dependencies: ScrollVirtualizationDependencies = createDefaultDependencies(),
 ): ScrollVirtualizationController {
+  let destroyed = false
   let patchFrameQueued = false
   let queuedAfterPatch: ((state: TranscriptSessionState) => void) | null = null
   let queuedRange: MountedRange | null = null
 
   const schedulePatch = (options: SchedulePatchOptions = {}) => {
+    if (destroyed) {
+      return false
+    }
+
     const nextRange = getMountedRangeForScrollPosition(state)
 
     if (nextRange === null) {
@@ -60,7 +66,7 @@ export function initializeScrollVirtualization(
     dependencies.requestAnimationFrame(() => {
       patchFrameQueued = false
 
-      if (queuedRange === null) {
+      if (destroyed || queuedRange === null) {
         return
       }
 
@@ -69,7 +75,7 @@ export function initializeScrollVirtualization(
       queuedRange = null
       queuedAfterPatch = null
 
-       if (state.isStreaming) {
+      if (state.isStreaming) {
         applyPendingAnchorCorrection(state)
         const placeholderEdge = resolveStreamingGapEdge(state.mountedRange, rangeToApply)
 
@@ -92,15 +98,26 @@ export function initializeScrollVirtualization(
   }
 
   schedulePatch()
-  state.scrollContainer.addEventListener(
-    'scroll',
-    () => {
-      schedulePatch()
-    },
-    { passive: true },
-  )
+  const scrollListener = () => {
+    schedulePatch()
+  }
 
-  return { schedulePatch }
+  state.scrollContainer.addEventListener('scroll', scrollListener, { passive: true })
+
+  return {
+    disconnect() {
+      if (destroyed) {
+        return
+      }
+
+      destroyed = true
+      patchFrameQueued = false
+      queuedRange = null
+      queuedAfterPatch = null
+      state.scrollContainer.removeEventListener('scroll', scrollListener)
+    },
+    schedulePatch,
+  }
 }
 
 function mergeAfterPatchCallbacks(
@@ -156,16 +173,16 @@ export function applyMountedRangeUpdate(
       ? 0
       : state.pendingScrollCorrection + resolveAnchorCorrection(anchor, viewportRect.top)
 
-  applyScrollCorrection(state.scrollContainer, correction)
   state.pendingScrollCorrection = 0
+  applyScrollCorrection(state.scrollContainer, correction)
   state.anchor = captureAnchorSnapshot(state.records, resolveViewportRect(state.scrollContainer))
 }
 
 export function applyPendingAnchorCorrection(state: TranscriptSessionState): void {
   const correction = state.anchor === null ? 0 : state.pendingScrollCorrection
 
-  applyScrollCorrection(state.scrollContainer, correction)
   state.pendingScrollCorrection = 0
+  applyScrollCorrection(state.scrollContainer, correction)
   state.anchor = captureAnchorSnapshot(state.records, resolveViewportRect(state.scrollContainer))
 }
 

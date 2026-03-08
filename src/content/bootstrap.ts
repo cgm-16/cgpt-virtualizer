@@ -11,6 +11,7 @@ import { clearStreamingPlaceholder } from './placeholder.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
 import {
   createStructuralRebuildObserverManager,
+  destroyTranscriptSession,
   requestDirtyRebuild,
   runDirtyRebuild,
 } from './rebuild.ts'
@@ -47,6 +48,7 @@ export interface ContentBootstrapDependencies {
 
 export interface ContentBootstrapResult {
   availability: ContentAvailability
+  destroy(): void
   scanResult: TranscriptScanResult | null
   sessionState: TranscriptSessionState | null
 }
@@ -67,6 +69,7 @@ export function bootstrapContentScript(
     availability === 'available' && selectors !== null && scanResult !== null
       ? createTranscriptSessionState(selectors.scrollContainer, scanResult)
       : null
+  let destroy = () => {}
 
   if (sessionState !== null && selectors !== null) {
     const activeSelectors = selectors
@@ -106,6 +109,11 @@ export function bootstrapContentScript(
       structuralRebuildObserverManager = null
       streamingObserverManager?.disconnect()
       streamingObserverManager = null
+    }
+    destroy = () => {
+      disconnectObservers()
+      scrollController.disconnect()
+      destroyTranscriptSession(activeSessionState)
     }
 
     const runPendingDirtyRebuild = () => {
@@ -208,7 +216,7 @@ export function bootstrapContentScript(
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
 
-  return { availability, scanResult, sessionState }
+  return { availability, destroy, scanResult, sessionState }
 }
 
 function createDefaultDependencies(): ContentBootstrapDependencies {

@@ -299,23 +299,23 @@
 
 ## 14. SPA navigation and session reset
 
-- [ ] Patch `history.pushState`
-- [ ] Patch `history.replaceState`
-- [ ] Listen for `popstate`
-- [ ] Re-run pathname parsing on navigation events
-- [ ] Detect conversation ID changes
-- [ ] On conversation ID change:
-  - [ ] fully destroy old session state
-  - [ ] disconnect observers
-  - [ ] discard cache and measurements
-  - [ ] initialize new session from scratch
-- [ ] Stay idle on non-transcript routes
-- [ ] Add integration tests for navigation/session reset
+- [x] Patch `history.pushState`
+- [x] Patch `history.replaceState`
+- [x] Listen for `popstate`
+- [x] Re-run pathname parsing on navigation events
+- [x] Detect conversation ID changes
+- [x] On conversation ID change:
+  - [x] fully destroy old session state
+  - [x] disconnect observers
+  - [x] discard cache and measurements
+  - [x] initialize new session from scratch
+- [x] Stay idle on non-transcript routes
+- [x] Add integration tests for navigation/session reset
 
 ### Acceptance criteria
-- [ ] Conversation ID change triggers full session reset
-- [ ] Same conversation ID does not trigger destructive reset
-- [ ] Non-transcript routes stay idle
+- [x] Conversation ID change triggers full session reset
+- [x] Same conversation ID does not trigger destructive reset
+- [x] Non-transcript routes stay idle
 
 ---
 

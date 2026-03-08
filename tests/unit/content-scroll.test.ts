@@ -5,7 +5,10 @@ import {
   accumulateScrollCorrection,
   captureAnchorSnapshot,
 } from '../../src/content/anchor.ts'
-import { applyMountedRangeUpdate } from '../../src/content/scroll.ts'
+import {
+  applyMountedRangeUpdate,
+  applyPendingAnchorCorrection,
+} from '../../src/content/scroll.ts'
 import type { BubbleRecord, TranscriptSessionState } from '../../src/content/state.ts'
 
 describe('applyMountedRangeUpdate', () => {
@@ -54,6 +57,45 @@ describe('applyMountedRangeUpdate', () => {
     expect(fixture.scrollContainer.scrollTop).toBe(275)
     expect(fixture.sessionState.pendingScrollCorrection).toBe(0)
     expect(fixture.sessionState.anchor?.index).toBe(2)
+  })
+})
+
+describe('applyPendingAnchorCorrection', () => {
+  it('scroll event가 동기적으로 발생해도 pending correction을 한 번만 소비한다', () => {
+    const fixture = makeSessionFixture([100, 100, 100, 100, 100], {
+      scrollTop: 250,
+      viewportHeight: 100,
+      viewportTop: 50,
+    })
+    let internalScrollTop = 250
+    let pendingCorrectionDuringScroll: number | null = null
+
+    applyMountedRangeUpdate(fixture.sessionState, { start: 0, end: 3 })
+    fixture.sessionState.anchor = captureAnchorSnapshot(fixture.sessionState.records, {
+      top: 50,
+      bottom: 150,
+    })
+    fixture.sessionState.pendingScrollCorrection = 25
+
+    Object.defineProperty(fixture.scrollContainer, 'scrollTop', {
+      configurable: true,
+      get() {
+        return internalScrollTop
+      },
+      set(nextScrollTop: number) {
+        internalScrollTop = nextScrollTop
+        fixture.scrollContainer.dispatchEvent(new Event('scroll'))
+      },
+    })
+    fixture.scrollContainer.addEventListener('scroll', () => {
+      pendingCorrectionDuringScroll = fixture.sessionState.pendingScrollCorrection
+    })
+
+    applyPendingAnchorCorrection(fixture.sessionState)
+
+    expect(internalScrollTop).toBe(275)
+    expect(pendingCorrectionDuringScroll).toBe(0)
+    expect(fixture.sessionState.pendingScrollCorrection).toBe(0)
   })
 })
 

@@ -1,3 +1,3 @@
-import { bootstrapContentScript } from './content/bootstrap.ts'
+import { startContentRuntime } from './content/navigation.ts'
 
-void bootstrapContentScript()
+void startContentRuntime()

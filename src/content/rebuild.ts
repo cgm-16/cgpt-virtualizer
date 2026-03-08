@@ -1,5 +1,6 @@
 import { captureAnchorSnapshot } from './anchor.ts'
 import type { MutationObserverLike } from './append.ts'
+import { clearStreamingPlaceholder } from './placeholder.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
 import type { ResolvedContentSelectors } from './selectors.ts'
 import {
@@ -117,6 +118,18 @@ export function runDirtyRebuild(
   }
 
   return true
+}
+
+export function destroyTranscriptSession(state: TranscriptSessionState): void {
+  clearStreamingPlaceholder(state)
+  state.transcriptRoot.replaceChildren(...state.records.map((record) => record.node))
+  state.records = []
+  state.prefixSums = []
+  state.mountedRange = null
+  state.anchor = null
+  state.pendingScrollCorrection = 0
+  state.dirtyRebuildReason = null
+  state.isStreaming = false
 }
 
 function captureRebuildAnchor(
