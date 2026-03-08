@@ -59,4 +59,29 @@ describe('rebuildPrefixSumsFromIndex', () => {
     expect(rebuildPrefixSumsFromIndex(prefixSums, records, 2)).toEqual([10, 30, 65.5, 110.75])
     expect(prefixSums).toEqual([10, 30, 60, 100])
   })
+
+  it('falls back to a full rebuild when records are empty', () => {
+    expect(rebuildPrefixSumsFromIndex([], [], 0)).toEqual([])
+  })
+
+  it('falls back to a full rebuild when changedIndex is 0', () => {
+    const records = [makeBubbleRecord(0, 20), makeBubbleRecord(1, 30)]
+    const stalePrefixSums = [10, 30]
+
+    expect(rebuildPrefixSumsFromIndex(stalePrefixSums, records, 0)).toEqual([20, 50])
+  })
+
+  it('falls back to a full rebuild when changedIndex equals records length', () => {
+    const records = [makeBubbleRecord(0, 10), makeBubbleRecord(1, 20)]
+    const prefixSums = buildPrefixSums(records)
+
+    expect(rebuildPrefixSumsFromIndex(prefixSums, records, 2)).toEqual([10, 30])
+  })
+
+  it('falls back to a full rebuild when prefixSums and records lengths differ', () => {
+    const records = [makeBubbleRecord(0, 10), makeBubbleRecord(1, 20)]
+    const stalePrefixSums = [10]
+
+    expect(rebuildPrefixSumsFromIndex(stalePrefixSums, records, 1)).toEqual([10, 30])
+  })
 })
