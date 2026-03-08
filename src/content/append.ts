@@ -23,6 +23,7 @@ export interface MutationObserverLike {
 
 export interface AppendObserverManager {
   disconnect(): void
+  flushPendingAppends(): void
   flushPendingMutationRecords(): void
 }
 
@@ -80,6 +81,11 @@ export function createAppendObserverManager(
 
     quietPeriodTimer = dependencies.setTimeout(() => {
       quietPeriodTimer = null
+
+      if (state.isStreaming) {
+        return
+      }
+
       commitPendingAppends(state, pendingNodes, dependencies)
       pendingNodes = []
     }, APPEND_QUIET_PERIOD_MS)
@@ -97,6 +103,19 @@ export function createAppendObserverManager(
       }
 
       observer.disconnect()
+    },
+    flushPendingAppends() {
+      if (quietPeriodTimer !== null) {
+        dependencies.clearTimeout(quietPeriodTimer)
+        quietPeriodTimer = null
+      }
+
+      if (state.isStreaming) {
+        return
+      }
+
+      commitPendingAppends(state, pendingNodes, dependencies)
+      pendingNodes = []
     },
     flushPendingMutationRecords() {
       observer.takeRecords()

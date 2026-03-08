@@ -7,6 +7,7 @@ import {
 } from './append.ts'
 import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
+import { clearStreamingPlaceholder } from './placeholder.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
 import { requestDirtyRebuild } from './rebuild.ts'
 import {
@@ -22,6 +23,10 @@ import {
   buildBubbleRecords,
   type TranscriptSessionState,
 } from './state.ts'
+import {
+  createStreamingObserverManager,
+  detectStreamingState,
+} from './streaming.ts'
 import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
 
 export interface ContentBootstrapDependencies {
@@ -61,6 +66,17 @@ export function bootstrapContentScript(
   if (sessionState !== null && selectors !== null) {
     let appendObserverManager: ReturnType<typeof createAppendObserverManager> | null = null
     let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
+    let streamingObserverManager: ReturnType<typeof createStreamingObserverManager> | null = null
+
+    sessionState.isStreaming = detectStreamingState(
+      dependencies.document,
+      selectors.streamingIndicatorSelector,
+    )
+
+    if (sessionState.isStreaming) {
+      markAllRecordsMounted(sessionState)
+    }
+
     const scrollController = initializeScrollVirtualization(sessionState, {
       afterPatch() {
         appendObserverManager?.flushPendingMutationRecords()
@@ -93,7 +109,25 @@ export function bootstrapContentScript(
       },
       setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
     })
+    streamingObserverManager = createStreamingObserverManager({
+      createMutationObserver:
+        dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+      document: dependencies.document,
+      onStreamingChange(nextIsStreaming) {
+        sessionState.isStreaming = nextIsStreaming
+
+        if (nextIsStreaming) {
+          return
+        }
+
+        clearStreamingPlaceholder(sessionState)
+        appendObserverManager?.flushPendingAppends()
+        scrollController.schedulePatch({ force: true })
+      },
+      streamingIndicatorSelector: selectors.streamingIndicatorSelector,
+    })
     resizeObserverManager.refreshObservedRecords()
+    streamingObserverManager.sync()
   }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
@@ -123,6 +157,7 @@ function createTranscriptSessionState(
   return {
     anchor: null,
     dirtyRebuildReason: null,
+    isStreaming: false,
     transcriptRoot: scanResult.transcriptRoot,
     pendingScrollCorrection: 0,
     scrollContainer,
@@ -130,4 +165,15 @@ function createTranscriptSessionState(
     prefixSums: buildPrefixSums(records),
     mountedRange: null,
   }
+}
+
+function markAllRecordsMounted(state: TranscriptSessionState): void {
+  for (const record of state.records) {
+    record.mounted = true
+  }
+
+  state.mountedRange =
+    state.records.length === 0
+      ? null
+      : { start: 0, end: state.records.length - 1 }
 }

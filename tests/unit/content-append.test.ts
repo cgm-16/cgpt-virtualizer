@@ -251,6 +251,61 @@ describe('createAppendObserverManager', () => {
     expect(fixture.scrollContainer.scrollTop).toBe(800)
   })
 
+  it('keeps pending append batches buffered until streaming ends', () => {
+    const fixture = makeSessionFixture([100, 100], {
+      clientHeight: 200,
+      scrollHeight: 1000,
+      scrollTop: 599,
+    })
+    const schedulePatch = vi.fn(() => true)
+    let callback: MutationCallback | null = null
+
+    fixture.sessionState.isStreaming = true
+
+    const manager = createAppendObserverManager(fixture.sessionState, {
+      clearTimeout: window.clearTimeout.bind(window),
+      createMutationObserver(nextCallback) {
+        callback = nextCallback
+
+        return {
+          disconnect() {},
+          observe() {},
+          takeRecords() {
+            return []
+          },
+        }
+      },
+      isTranscriptBubble,
+      measure(node) {
+        return fixture.measuredHeights.get(node) ?? 0
+      },
+      requestDirtyRebuild() {},
+      schedulePatch,
+      setTimeout: window.setTimeout.bind(window),
+    })
+
+    const bubble = createBubble('Bubble 2')
+
+    fixture.measuredHeights.set(bubble, 100)
+    fixture.transcriptRoot.append(bubble)
+    callback?.(
+      [makeChildListMutationRecord(fixture.transcriptRoot, [bubble])],
+      {} as MutationObserver,
+    )
+
+    vi.advanceTimersByTime(APPEND_QUIET_PERIOD_MS)
+
+    expect(fixture.sessionState.records).toHaveLength(2)
+    expect(schedulePatch).not.toHaveBeenCalled()
+
+    fixture.sessionState.isStreaming = false
+    manager.flushPendingAppends()
+
+    expect(fixture.sessionState.records).toHaveLength(3)
+    expect(schedulePatch).toHaveBeenCalledTimes(1)
+    expect(schedulePatch).toHaveBeenCalledWith({ force: true })
+  })
+
   it('requests a dirty rebuild for invalid append patterns and clears pending appends', () => {
     const fixture = makeSessionFixture([100, 100])
     const requestDirtyRebuild = vi.fn()
@@ -396,6 +451,7 @@ function makeSessionFixture(
     sessionState: {
       anchor: null,
       dirtyRebuildReason: null,
+      isStreaming: false,
       mountedRange: { end: 0, start: 0 },
       pendingScrollCorrection: 0,
       prefixSums: buildPrefixSums(heights),

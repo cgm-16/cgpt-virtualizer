@@ -249,23 +249,23 @@
 
 ## 12. Streaming behavior
 
-- [ ] Add exact-selector-based streaming detection
-- [ ] While streaming:
-  - [ ] pause mount/unmount
-  - [ ] keep resize handling active
-  - [ ] keep anchor correction active
-  - [ ] keep append batches pending
-- [ ] Add inline informational placeholder for scrolling into unmounted region during streaming
-- [ ] On streaming end:
-  - [ ] clear placeholder
-  - [ ] fold pending append batch into immediate recompute-and-patch
-- [ ] Add integration tests for streaming pause behavior
+- [x] Add exact-selector-based streaming detection
+- [x] While streaming:
+  - [x] pause mount/unmount
+  - [x] keep resize handling active
+  - [x] keep anchor correction active
+  - [x] keep append batches pending
+- [x] Add inline informational placeholder for scrolling into unmounted region during streaming
+- [x] On streaming end:
+  - [x] clear placeholder
+  - [x] fold pending append batch into immediate recompute-and-patch
+- [x] Add integration tests for streaming pause behavior
 
 ### Acceptance criteria
-- [ ] Mount/unmount pauses during streaming
-- [ ] Resize updates still apply during streaming
-- [ ] Placeholder appears when needed
-- [ ] Pending appends commit after streaming ends
+- [x] Mount/unmount pauses during streaming
+- [x] Resize updates still apply during streaming
+- [x] Placeholder appears when needed
+- [x] Pending appends commit after streaming ends
 
 ---
 

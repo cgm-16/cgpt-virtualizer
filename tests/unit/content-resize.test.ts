@@ -241,6 +241,7 @@ function makeSessionFixture(
     sessionState: {
       anchor: null,
       dirtyRebuildReason: null,
+      isStreaming: false,
       mountedRange: null,
       pendingScrollCorrection: 0,
       prefixSums,
