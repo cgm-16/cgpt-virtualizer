@@ -114,8 +114,12 @@ describe('createAppendObserverManager', () => {
     expect(observe).toHaveBeenCalledWith(fixture.transcriptRoot, { childList: true })
   })
 
-  it('batches valid tail appends and extends session state after the quiet period', () => {
-    const fixture = makeSessionFixture([100, 100])
+  it('batches valid tail appends and keeps detached mode when not near bottom', () => {
+    const fixture = makeSessionFixture([100, 100], {
+      clientHeight: 200,
+      scrollHeight: 1000,
+      scrollTop: 599,
+    })
     const schedulePatch = vi.fn(() => true)
     let callback: MutationCallback | null = null
 
@@ -185,6 +189,66 @@ describe('createAppendObserverManager', () => {
     expect(schedulePatch).toHaveBeenCalledWith({ force: true })
 
     manager.disconnect()
+  })
+
+  it('adds an exact-bottom snap after patching when the viewport is near bottom', () => {
+    const fixture = makeSessionFixture([100, 100], {
+      clientHeight: 200,
+      scrollHeight: 1000,
+      scrollTop: 600,
+    })
+    const schedulePatch = vi.fn(() => true)
+    let callback: MutationCallback | null = null
+
+    createAppendObserverManager(fixture.sessionState, {
+      clearTimeout: window.clearTimeout.bind(window),
+      createMutationObserver(nextCallback) {
+        callback = nextCallback
+
+        return {
+          disconnect() {},
+          observe() {},
+          takeRecords() {
+            return []
+          },
+        }
+      },
+      isTranscriptBubble,
+      measure(node) {
+        return fixture.measuredHeights.get(node) ?? 0
+      },
+      requestDirtyRebuild() {},
+      schedulePatch,
+      setTimeout: window.setTimeout.bind(window),
+    })
+
+    const bubble = createBubble('Bubble 2')
+
+    fixture.measuredHeights.set(bubble, 100)
+    fixture.transcriptRoot.append(bubble)
+    callback?.(
+      [makeChildListMutationRecord(fixture.transcriptRoot, [bubble])],
+      {} as MutationObserver,
+    )
+
+    vi.advanceTimersByTime(APPEND_QUIET_PERIOD_MS)
+
+    expect(schedulePatch).toHaveBeenCalledTimes(1)
+    expect(schedulePatch).toHaveBeenCalledWith({
+      afterPatch: expect.any(Function),
+      force: true,
+    })
+
+    const options = schedulePatch.mock.calls[0]?.[0]
+
+    if (options?.afterPatch === undefined) {
+      throw new Error('expected a near-bottom afterPatch callback')
+    }
+
+    options.afterPatch(fixture.sessionState)
+
+    expect(fixture.sessionState.records).toHaveLength(3)
+    expect(fixture.scrollContainer.scrollTop).toBe(800)
   })
 
   it('requests a dirty rebuild for invalid append patterns and clears pending appends', () => {
@@ -269,9 +333,17 @@ describe('createAppendObserverManager', () => {
   })
 })
 
-function makeSessionFixture(heights: number[]): {
+function makeSessionFixture(
+  heights: number[],
+  options: {
+    clientHeight?: number
+    scrollHeight?: number
+    scrollTop?: number
+  } = {},
+): {
   bubbles: HTMLElement[]
   measuredHeights: Map<Element, number>
+  scrollContainer: HTMLElement
   sessionState: TranscriptSessionState
   transcriptRoot: HTMLElement
 } {
@@ -295,6 +367,17 @@ function makeSessionFixture(heights: number[]): {
 
   transcriptRoot.insertBefore(topSpacer, transcriptRoot.firstChild)
   transcriptRoot.append(bottomSpacer)
+
+  Object.defineProperty(scrollContainer, 'clientHeight', {
+    configurable: true,
+    value: options.clientHeight ?? 200,
+  })
+  Object.defineProperty(scrollContainer, 'scrollHeight', {
+    configurable: true,
+    value: options.scrollHeight ?? Math.max(0, (heights.length * 100) + 200),
+  })
+  scrollContainer.scrollTop = options.scrollTop ?? 0
+
   scrollContainer.append(transcriptRoot)
   document.body.append(scrollContainer)
 
@@ -309,6 +392,7 @@ function makeSessionFixture(heights: number[]): {
   return {
     bubbles,
     measuredHeights,
+    scrollContainer,
     sessionState: {
       anchor: null,
       dirtyRebuildReason: null,

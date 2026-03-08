@@ -385,7 +385,94 @@ test('anchor 위 bubble resize는 읽기 위치를 유지한다', async ({ page 
     })
 })
 
-test('clean tail append burst는 quiet period 후 한 번만 패치한다', async ({ page }) => {
+test('near-bottom append는 새 tail을 mount하고 exact bottom으로 따라간다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = 4800
+    scrollContainer.dispatchEvent(new Event('scroll'))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+          scrollTop:
+            document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')?.scrollTop ?? null,
+        }
+      }),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 0px;',
+      lastBubbleText: 'Bubble 49',
+      rafCallCount: 2,
+      scrollTop: 4800,
+    })
+
+  await page.evaluate(async () => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+
+    if (transcriptRoot === null) {
+      throw new Error('transcript root fixture is missing')
+    }
+
+    const first = document.createElement('article')
+    first.setAttribute('data-cgpt-transcript-bubble', '')
+    first.setAttribute('style', 'display: block; height: 100px;')
+    first.textContent = 'Bubble 50'
+
+    const second = document.createElement('article')
+    second.setAttribute('data-cgpt-transcript-bubble', '')
+    second.setAttribute('style', 'display: block; height: 100px;')
+    second.textContent = 'Bubble 51'
+
+    ;(window as WindowWithTestState).__tailAppendNodes = [first, second]
+
+    transcriptRoot.append(first)
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+    transcriptRoot.append(second)
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          childCount: children.length,
+          detachedTailBubbleCount:
+            (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          scrollTop:
+            document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')?.scrollTop ?? null,
+        }
+      }),
+    )
+    .toEqual({
+      childCount: 6,
+      detachedTailBubbleCount: 0,
+      lastBubbleText: 'Bubble 51',
+      scrollTop: 5000,
+    })
+})
+
+test('non-near-bottom append burst는 detached tail로 남는다', async ({ page }) => {
   await installFixtureRoutes(page)
   await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
 
@@ -427,6 +514,8 @@ test('clean tail append burst는 quiet period 후 한 번만 패치한다', asyn
           detachedTailBubbleCount:
             (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
           rafCallCount: (window as WindowWithTestState).__rafCallCount,
+          scrollTop:
+            document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')?.scrollTop ?? null,
         }
       }),
     )
@@ -435,6 +524,7 @@ test('clean tail append burst는 quiet period 후 한 번만 패치한다', asyn
       childCount: 6,
       detachedTailBubbleCount: 2,
       rafCallCount: 2,
+      scrollTop: 0,
     })
 })
 
