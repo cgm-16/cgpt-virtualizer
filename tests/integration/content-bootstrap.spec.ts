@@ -134,9 +134,7 @@ test('스크롤로 mounted range가 바뀌면 다음 frame에서만 패치한다
   await installFixtureRoutes(page)
   await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
 
-  await expect
-    .poll(async () => page.evaluate(() => (window as WindowWithTestState).__rafCallCount))
-    .toBe(1)
+  await expectInitialMountedWindow(page)
 
   await page.evaluate(() => {
     const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
@@ -173,9 +171,7 @@ test('range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다
   await installFixtureRoutes(page)
   await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
 
-  await expect
-    .poll(async () => page.evaluate(() => (window as WindowWithTestState).__rafCallCount))
-    .toBe(1)
+  await expectInitialMountedWindow(page)
 
   await page.evaluate(() => {
     const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
@@ -208,6 +204,187 @@ test('range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다
   expect(await page.evaluate(() => (window as WindowWithTestState).__rafCallCount)).toBe(2)
 })
 
+test('mounted bubble resize는 prefix sum과 mounted range를 갱신한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
+          childCount: children.length,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 4600px;',
+      childCount: 6,
+      lastBubbleText: 'Bubble 3',
+      rafCallCount: 1,
+    })
+
+  await page.evaluate(() => {
+    ;(window as WindowWithTestState).__allBubbles[0]?.setAttribute(
+      'style',
+      'display: block; height: 250px;',
+    )
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
+          childCount: children.length,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 4700px;',
+      childCount: 5,
+      lastBubbleText: 'Bubble 2',
+      rafCallCount: 2,
+    })
+})
+
+test('detached bubble resize는 관찰되지 않는다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => ({
+        bottomSpacerHeight:
+          document.querySelector('[data-cgpt-bottom-spacer]')?.getAttribute('style') ?? null,
+        detachedBubbleConnected:
+          (window as WindowWithTestState).__allBubbles[10]?.isConnected ?? null,
+        rafCallCount: (window as WindowWithTestState).__rafCallCount,
+      })),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 4600px;',
+      detachedBubbleConnected: false,
+      rafCallCount: 1,
+    })
+
+  await page.evaluate(async () => {
+    ;(window as WindowWithTestState).__allBubbles[10]?.setAttribute(
+      'style',
+      'display: block; height: 250px;',
+    )
+
+    await new Promise((resolve) => window.setTimeout(resolve, 100))
+  })
+
+  expect(
+    await page.evaluate(() => ({
+      bottomSpacerHeight:
+        document.querySelector('[data-cgpt-bottom-spacer]')?.getAttribute('style') ?? null,
+      rafCallCount: (window as WindowWithTestState).__rafCallCount,
+    })),
+  ).toEqual({
+    bottomSpacerHeight: 'height: 4600px;',
+    rafCallCount: 1,
+  })
+})
+
+test('anchor 위 bubble resize는 읽기 위치를 유지한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      lastBubbleText: 'Bubble 6',
+      rafCallCount: 2,
+    })
+
+  const beforeResize = await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const anchorBubble = (window as WindowWithTestState).__allBubbles[2]
+
+    if (scrollContainer === null || anchorBubble === undefined) {
+      throw new Error('anchor fixture is missing')
+    }
+
+    return {
+      anchorOffset:
+        anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+      scrollTop: scrollContainer.scrollTop,
+    }
+  })
+
+  expect(beforeResize).toEqual({
+    anchorOffset: -50,
+    scrollTop: 250,
+  })
+
+  await page.evaluate(() => {
+    ;(window as WindowWithTestState).__allBubbles[0]?.setAttribute(
+      'style',
+      'display: block; height: 125px;',
+    )
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+        const anchorBubble = (window as WindowWithTestState).__allBubbles[2]
+
+        if (scrollContainer === null || anchorBubble === undefined) {
+          throw new Error('anchor fixture is missing')
+        }
+
+        return {
+          anchorOffset:
+            anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+          scrollTop: scrollContainer.scrollTop,
+        }
+      }),
+    )
+    .toEqual({
+      anchorOffset: -50,
+      rafCallCount: 2,
+      scrollTop: 275,
+    })
+})
+
 function renderFixtureHtml(requestPath: string): string {
   const url = new URL(`http://fixture${requestPath}`)
   const fixture = url.searchParams.get('fixture')
@@ -223,6 +400,7 @@ function renderFixtureHtml(requestPath: string): string {
     <script>
       window.__reportedMessages = []
       window.__rafCallCount = 0
+      window.__allBubbles = Array.from(document.querySelectorAll('[data-cgpt-transcript-bubble]'))
       const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window)
       window.requestAnimationFrame = function requestAnimationFrameWrapper(callback) {
         window.__rafCallCount += 1
@@ -342,6 +520,28 @@ async function installFixtureRoutes(page: Page): Promise<void> {
   })
 }
 
+async function expectInitialMountedWindow(page: Page): Promise<void> {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      firstBubbleText: 'Bubble 0',
+      lastBubbleText: 'Bubble 3',
+      rafCallCount: 1,
+    })
+}
+
 interface WindowWithTestState extends Window {
+  __allBubbles: HTMLElement[]
   __rafCallCount: number
 }
