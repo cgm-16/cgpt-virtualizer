@@ -789,6 +789,204 @@ test('non-near-bottom append burst는 detached tail로 남는다', async ({ page
     })
 })
 
+test('mid-list removal은 dirty rebuild를 트리거하고 surviving anchor 위치를 복원한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+  await scrollToTranscriptPosition(page, 400, {
+    firstBubbleText: 'Bubble 2',
+    lastBubbleText: 'Bubble 7',
+    rafCallCount: 2,
+  })
+
+  expect(
+    await page.evaluate(() => {
+      const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+      const anchorBubble = (window as WindowWithTestState).__allBubbles[4]
+
+      if (scrollContainer === null || anchorBubble === undefined) {
+        throw new Error('dirty rebuild anchor fixture is missing')
+      }
+
+      return {
+        anchorOffset:
+          anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+        scrollTop: scrollContainer.scrollTop,
+      }
+    }),
+  ).toEqual({
+    anchorOffset: 0,
+    scrollTop: 400,
+  })
+
+  await page.evaluate(() => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+    const removedBubble = (window as WindowWithTestState).__allBubbles[3]
+
+    if (transcriptRoot === null || removedBubble === undefined) {
+      throw new Error('dirty rebuild removal fixture is missing')
+    }
+
+    transcriptRoot.removeChild(removedBubble)
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const anchorBubble = (window as WindowWithTestState).__allBubbles[4]
+        const removedBubble = (window as WindowWithTestState).__allBubbles[3]
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        if (scrollContainer === null || anchorBubble === undefined) {
+          throw new Error('dirty rebuild anchor fixture is missing')
+        }
+
+        return {
+          anchorOffset:
+            anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+          childCount: children.length,
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          removedConnected: removedBubble?.isConnected ?? null,
+          scrollTop: scrollContainer.scrollTop,
+        }
+      }),
+    )
+    .toEqual({
+      anchorOffset: 0,
+      childCount: 8,
+      firstBubbleText: 'Bubble 1',
+      lastBubbleText: 'Bubble 7',
+      removedConnected: false,
+      scrollTop: 300,
+    })
+})
+
+test('anchor bubble가 사라지면 dirty rebuild는 raw scrollTop fallback을 사용한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+  await scrollToTranscriptPosition(page, 400, {
+    firstBubbleText: 'Bubble 2',
+    lastBubbleText: 'Bubble 7',
+    rafCallCount: 2,
+  })
+
+  await page.evaluate(() => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+    const removedAnchor = (window as WindowWithTestState).__allBubbles[4]
+
+    if (transcriptRoot === null || removedAnchor === undefined) {
+      throw new Error('dirty rebuild fallback fixture is missing')
+    }
+
+    transcriptRoot.removeChild(removedAnchor)
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const removedAnchor = (window as WindowWithTestState).__allBubbles[4]
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        if (scrollContainer === null) {
+          throw new Error('dirty rebuild fallback fixture is missing')
+        }
+
+        return {
+          childCount: children.length,
+          firstBubbleText: children[1]?.textContent ?? null,
+          removedConnected: removedAnchor?.isConnected ?? null,
+          scrollTop: scrollContainer.scrollTop,
+        }
+      }),
+    )
+    .toEqual({
+      childCount: 8,
+      firstBubbleText: 'Bubble 2',
+      removedConnected: false,
+      scrollTop: 400,
+    })
+})
+
+test('dirty rebuild 뒤에도 append observer가 다시 연결된다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+  await scrollToTranscriptPosition(page, 400, {
+    firstBubbleText: 'Bubble 2',
+    lastBubbleText: 'Bubble 7',
+    rafCallCount: 2,
+  })
+
+  await page.evaluate(() => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+    const removedBubble = (window as WindowWithTestState).__allBubbles[3]
+
+    if (transcriptRoot === null || removedBubble === undefined) {
+      throw new Error('dirty rebuild append fixture is missing')
+    }
+
+    transcriptRoot.removeChild(removedBubble)
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => ({
+        scrollTop:
+          document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')?.scrollTop ?? null,
+      })),
+    )
+    .toEqual({
+      scrollTop: 300,
+    })
+
+  await page.evaluate(async () => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+
+    if (transcriptRoot === null) {
+      throw new Error('dirty rebuild append fixture is missing')
+    }
+
+    const appendedBubble = document.createElement('article')
+    appendedBubble.setAttribute('data-cgpt-transcript-bubble', '')
+    appendedBubble.setAttribute('style', 'display: block; height: 100px;')
+    appendedBubble.textContent = 'Bubble 50'
+
+    ;(window as WindowWithTestState).__tailAppendNodes = [appendedBubble]
+
+    transcriptRoot.append(appendedBubble)
+    await new Promise((resolve) => window.setTimeout(resolve, 200))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
+          childCount: children.length,
+          detachedTailBubbleCount:
+            (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
+        }
+      }),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 4300px;',
+      childCount: 8,
+      detachedTailBubbleCount: 1,
+    })
+})
+
 function renderFixtureHtml(requestPath: string): string {
   const url = new URL(`http://fixture${requestPath}`)
   const fixture = url.searchParams.get('fixture')
@@ -943,6 +1141,42 @@ async function expectInitialMountedWindow(page: Page): Promise<void> {
       lastBubbleText: 'Bubble 3',
       rafCallCount: 1,
     })
+}
+
+async function scrollToTranscriptPosition(
+  page: Page,
+  scrollTop: number,
+  expectedWindow: {
+    firstBubbleText: string
+    lastBubbleText: string
+    rafCallCount: number
+  },
+): Promise<void> {
+  await page.evaluate((nextScrollTop) => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = nextScrollTop
+    scrollContainer.dispatchEvent(new Event('scroll'))
+  }, scrollTop)
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual(expectedWindow)
 }
 
 interface WindowWithTestState extends Window {
