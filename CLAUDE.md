@@ -125,7 +125,7 @@ When multiple independent tasks exist, spawn them ALL in one message:
 - ALWAYS open a PR for merge-intent changes.
 - ALWAYS use a template if one exists.
 - YOU MUST fill all required sections. If a required section is not applicable, write `N/A` with a reason.
-- ALWAYS keep the linked Issue open during review and close it on merge/completion, not at PR creation.
+- ALWAYS allow the issue to close on merge/completion.
 - If PR creation is blocked by auth/permission/remote issues, STOP and ask Ori with branch name, commit status, and blocker details.
 
 ## Systematic Debugging Process
