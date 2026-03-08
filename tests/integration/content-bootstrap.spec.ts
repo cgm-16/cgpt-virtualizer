@@ -130,6 +130,52 @@ test('bubble이 50개일 때 spacer와 전체 mounted range를 초기 패치한�
     })
 })
 
+test('memory guard 임계값을 넘으면 탭 비활성화 요청을 보내고 transcript DOM을 복구한다', async ({
+  page,
+}) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-2501?fixture=bubble-2501')
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+        const sentMessages = (window as WindowWithTestState).__sentMessages
+
+        return {
+          bubbleCount:
+            transcriptRoot?.querySelectorAll('[data-cgpt-transcript-bubble]').length ?? 0,
+          disableRequestCount: sentMessages.filter(
+            (message) =>
+              typeof message === 'object' &&
+              message !== null &&
+              'type' in message &&
+              message.type === 'runtime/disable-tab-virtualization',
+          ).length,
+          hasBottomSpacer:
+            transcriptRoot?.querySelector('[data-cgpt-bottom-spacer]') !== null,
+          hasTopSpacer: transcriptRoot?.querySelector('[data-cgpt-top-spacer]') !== null,
+          lastAvailability:
+            (window as WindowWithTestState).__reportedMessages.at(-1) !== undefined &&
+            typeof (window as WindowWithTestState).__reportedMessages.at(-1) === 'object'
+              ? ((window as WindowWithTestState).__reportedMessages.at(-1) as {
+                  availability?: string
+                }).availability ?? null
+              : null,
+          tabEnabled: (window as WindowWithTestState).__tabEnabled,
+        }
+      }),
+    )
+    .toEqual({
+      bubbleCount: 2501,
+      disableRequestCount: 1,
+      hasBottomSpacer: false,
+      hasTopSpacer: false,
+      lastAvailability: 'available',
+      tabEnabled: false,
+    })
+})
+
 test('mid-session selector failure는 Unavailable로 전환되고 navigation 전까지 inert 상태를 유지한다', async ({
   page,
 }) => {
@@ -1213,6 +1259,7 @@ function renderFixtureHtml(requestPath: string): string {
     'bubble-0': renderFixtureBody('bubble-0'),
     'bubble-49': renderFixtureBody('bubble-49'),
     'bubble-50': renderFixtureBody('bubble-50'),
+    'bubble-2501': renderFixtureBody('bubble-2501'),
     'bubble-50-alt': renderFixtureBody('bubble-50-alt'),
     missing: renderFixtureBody('missing'),
   }
@@ -1227,6 +1274,8 @@ function renderFixtureHtml(requestPath: string): string {
     ${renderFixtureBody(fixture)}
     <script>
       window.__reportedMessages = []
+      window.__sentMessages = []
+      window.__tabEnabled = true
       window.__rafCallCount = 0
       window.__allBubbles = Array.from(document.querySelectorAll('[data-cgpt-transcript-bubble]'))
       window.__fixtureBodies = ${JSON.stringify(fixtureBodies)}
@@ -1248,10 +1297,28 @@ function renderFixtureHtml(requestPath: string): string {
             addListener() {},
           },
           sendMessage(message, callback) {
-            window.__reportedMessages.push(message)
+            window.__sentMessages.push(message)
+
+            if (message?.type === 'runtime/get-tab-enabled') {
+              if (typeof callback === 'function') {
+                callback({
+                  enabled: window.__tabEnabled,
+                  type: 'runtime/tab-enabled',
+                })
+              }
+              return
+            }
+
+            if (message?.type === 'runtime/disable-tab-virtualization') {
+              window.__tabEnabled = false
+            }
+
+            if (message?.type === 'runtime/report-content-availability') {
+              window.__reportedMessages.push(message)
+            }
 
             if (typeof callback === 'function') {
-              callback(undefined)
+              callback(null)
             }
           },
         },
@@ -1295,10 +1362,18 @@ function renderFixtureBody(fixture: string | null): string {
   if (
     fixture === 'bubble-0' ||
     fixture === 'bubble-49' ||
+    fixture === 'bubble-2501' ||
     fixture === 'bubble-50' ||
     fixture === 'bubble-50-alt'
   ) {
-    const count = fixture === 'bubble-0' ? 0 : fixture === 'bubble-49' ? 49 : 50
+    const count =
+      fixture === 'bubble-0'
+        ? 0
+        : fixture === 'bubble-49'
+          ? 49
+          : fixture === 'bubble-2501'
+            ? 2501
+            : 50
     const labelPrefix = fixture === 'bubble-50-alt' ? 'Next Bubble' : 'Bubble'
 
     return `
@@ -1427,5 +1502,7 @@ interface WindowWithTestState extends Window {
   __rafCallCount: number
   __replaceFixture(fixture: string): void
   __reportedMessages: unknown[]
+  __sentMessages: Array<{ type?: string }>
+  __tabEnabled: boolean
   __tailAppendNodes: HTMLElement[]
 }

@@ -21,9 +21,16 @@ import {
   reportUnavailableStatus,
 } from './failure.ts'
 import {
+  DEFAULT_MEMORY_GUARD_THRESHOLD,
+  estimateDetachedCachePressure,
+  shouldDisableVirtualizationForMemory,
+  type MemoryGuardThreshold,
+} from './memory-guard.ts'
+import {
   createResizeObserverManager,
   type ResizeObserverLike,
 } from './resize.ts'
+import { disableCurrentTabVirtualization } from './runtime-control.ts'
 import {
   applyPendingAnchorCorrection,
   initializeScrollVirtualization,
@@ -44,7 +51,9 @@ export interface ContentBootstrapDependencies {
   clearTimeout?(handle: number): void
   createMutationObserver?(callback: MutationCallback): MutationObserverLike
   createResizeObserver?(callback: ResizeObserverCallback): ResizeObserverLike
+  disableVirtualizationForMemoryGuard?(): Promise<void> | void
   document: Document
+  memoryGuardThreshold?: MemoryGuardThreshold
   pathname: string
   reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
   requestAnimationFrame?(callback: FrameRequestCallback): number
@@ -100,6 +109,9 @@ export function bootstrapContentScript(
     let streamingObserverManager: ReturnType<typeof createStreamingObserverManager> | null = null
     let dirtyRebuildInProgress = false
     let sessionClosed = false
+    let scrollController: ReturnType<typeof initializeScrollVirtualization> | null = null
+    const memoryGuardThreshold =
+      dependencies.memoryGuardThreshold ?? DEFAULT_MEMORY_GUARD_THRESHOLD
 
     activeSessionState.isStreaming = detectStreamingState(
       dependencies.document,
@@ -109,15 +121,6 @@ export function bootstrapContentScript(
     if (activeSessionState.isStreaming) {
       markAllRecordsMounted(activeSessionState)
     }
-
-    const scrollController = initializeScrollVirtualization(activeSessionState, {
-      afterPatch() {
-        appendObserverManager?.flushPendingMutationRecords()
-        structuralRebuildObserverManager?.flushPendingMutationRecords()
-        resizeObserverManager?.refreshObservedRecords()
-      },
-      requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
-    })
 
     const disconnectObservers = () => {
       appendObserverManager?.disconnect()
@@ -139,7 +142,8 @@ export function bootstrapContentScript(
 
       sessionClosed = true
       disconnectObservers()
-      scrollController.disconnect()
+      scrollController?.disconnect()
+      scrollController = null
       destroyTranscriptSession(activeSessionState)
 
       return true
@@ -151,6 +155,32 @@ export function bootstrapContentScript(
       }
 
       reportUnavailableStatus(dependencies.reportAvailability)
+
+      return true
+    }
+
+    scrollController = initializeScrollVirtualization(activeSessionState, {
+      afterPatch() {
+        appendObserverManager?.flushPendingMutationRecords()
+        structuralRebuildObserverManager?.flushPendingMutationRecords()
+        resizeObserverManager?.refreshObservedRecords()
+        maybeHandleMemoryGuard()
+      },
+      requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
+    })
+
+    function maybeHandleMemoryGuard(): boolean {
+      const pressure = estimateDetachedCachePressure(activeSessionState)
+
+      if (!shouldDisableVirtualizationForMemory(pressure, memoryGuardThreshold)) {
+        return false
+      }
+
+      if (!teardownSession()) {
+        return false
+      }
+
+      void (dependencies.disableVirtualizationForMemoryGuard ?? disableCurrentTabVirtualization)()
 
       return true
     }
@@ -178,7 +208,7 @@ export function bootstrapContentScript(
           reconnectObservers: connectObservers,
           resolveSelectors,
           schedulePatch(options) {
-            return scrollController.schedulePatch(options)
+            return scrollController?.schedulePatch(options) ?? false
           },
         })
       } finally {
@@ -208,7 +238,7 @@ export function bootstrapContentScript(
           dependencies.createResizeObserver ?? ((callback) => new ResizeObserver(callback)),
         measure: measureBubble,
         schedulePatch() {
-          return scrollController.schedulePatch()
+          return scrollController?.schedulePatch() ?? false
         },
       })
       appendObserverManager = createAppendObserverManager(activeSessionState, {
@@ -221,7 +251,7 @@ export function bootstrapContentScript(
         measure: measureBubble,
         requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
         schedulePatch(options) {
-          return scrollController.schedulePatch(options)
+          return scrollController?.schedulePatch(options) ?? false
         },
         setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
       })
@@ -258,7 +288,7 @@ export function bootstrapContentScript(
           }
 
           appendObserverManager?.flushPendingAppends()
-          scrollController.schedulePatch({ force: true })
+          scrollController?.schedulePatch({ force: true })
         },
         streamingIndicatorSelector: activeSelectors.streamingIndicatorSelector,
       })
@@ -267,7 +297,9 @@ export function bootstrapContentScript(
       streamingObserverManager.sync()
     }
 
-    connectObservers()
+    if (!sessionClosed) {
+      connectObservers()
+    }
   }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))

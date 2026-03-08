@@ -262,6 +262,40 @@ describe('transcript scan integration', () => {
     expect(Array.from(fixture.transcriptRoot.children)).toHaveLength(6)
   })
 
+  it('memory guard 임계값을 넘으면 세션을 정리하고 탭 비활성화를 요청한다', () => {
+    const disableVirtualizationForMemoryGuard = vi.fn()
+    const mutationObservers: MockMutationObserverEntry[] = []
+    const fixture = makeLiveMeasuredDocumentFixture(Array.from({ length: 50 }, () => 100), {
+      viewportHeight: 200,
+    })
+
+    const result = bootstrapContentScript({
+      createMutationObserver: createMockMutationObserverFactory(mutationObservers),
+      createResizeObserver: createNoopResizeObserver,
+      disableVirtualizationForMemoryGuard,
+      document,
+      memoryGuardThreshold: {
+        detachedNodeCount: 1,
+        estimatedDetachedHeight: 1,
+      },
+      pathname: '/c/example',
+      reportAvailability() {},
+      requestAnimationFrame(callback) {
+        callback(0)
+        return 1
+      },
+    })
+
+    expect(disableVirtualizationForMemoryGuard).toHaveBeenCalledTimes(1)
+    expect(result.sessionState?.records).toHaveLength(0)
+    expect(result.sessionState?.mountedRange).toBeNull()
+    expect(fixture.transcriptRoot.querySelector('[data-cgpt-top-spacer]')).toBeNull()
+    expect(fixture.transcriptRoot.querySelector('[data-cgpt-bottom-spacer]')).toBeNull()
+    expect(
+      fixture.transcriptRoot.querySelectorAll('[data-cgpt-transcript-bubble]'),
+    ).toHaveLength(50)
+  })
+
   it('reports unavailable and becomes inert when selectors disappear mid-session', () => {
     const reports: unknown[] = []
     const mutationObservers: MockMutationObserverEntry[] = []
