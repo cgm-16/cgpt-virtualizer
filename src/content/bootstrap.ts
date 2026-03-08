@@ -4,7 +4,14 @@ import { isSupportedTranscriptPath } from '../shared/routes.ts'
 import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
-import { initializeScrollVirtualization } from './scroll.ts'
+import {
+  createResizeObserverManager,
+  type ResizeObserverLike,
+} from './resize.ts'
+import {
+  applyPendingAnchorCorrection,
+  initializeScrollVirtualization,
+} from './scroll.ts'
 import { resolveSelectors } from './selectors.ts'
 import {
   buildBubbleRecords,
@@ -13,6 +20,7 @@ import {
 import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
 
 export interface ContentBootstrapDependencies {
+  createResizeObserver?(callback: ResizeObserverCallback): ResizeObserverLike
   document: Document
   pathname: string
   reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
@@ -43,9 +51,25 @@ export function bootstrapContentScript(
       : null
 
   if (sessionState !== null) {
-    initializeScrollVirtualization(sessionState, {
+    let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
+    const scrollController = initializeScrollVirtualization(sessionState, {
+      afterPatch() {
+        resizeObserverManager?.refreshObservedRecords()
+      },
       requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
     })
+    resizeObserverManager = createResizeObserverManager(sessionState, {
+      applyPendingCorrection() {
+        applyPendingAnchorCorrection(sessionState)
+      },
+      createResizeObserver:
+        dependencies.createResizeObserver ?? ((callback) => new ResizeObserver(callback)),
+      measure: measureBubble,
+      schedulePatch() {
+        return scrollController.schedulePatch()
+      },
+    })
+    resizeObserverManager.refreshObservedRecords()
   }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))

@@ -9,34 +9,39 @@ import { patchMountedRange } from './patch.ts'
 import { findRangeByScrollPosition, shouldSchedulePatch } from './range.ts'
 import type { MountedRange, TranscriptSessionState } from './state.ts'
 
+export interface ScrollVirtualizationController {
+  schedulePatch(): boolean
+}
+
 export interface ScrollVirtualizationDependencies {
+  afterPatch?(state: TranscriptSessionState): void
   requestAnimationFrame(callback: FrameRequestCallback): number
 }
 
 export function initializeScrollVirtualization(
   state: TranscriptSessionState,
   dependencies: ScrollVirtualizationDependencies = createDefaultDependencies(),
-): void {
+): ScrollVirtualizationController {
   let patchFrameQueued = false
   let queuedRange: MountedRange | null = null
 
-  const handleScroll = () => {
+  const schedulePatch = () => {
     const nextRange = getMountedRangeForScrollPosition(state)
 
     if (nextRange === null) {
-      return
+      return false
     }
 
     const currentTargetRange = queuedRange ?? state.mountedRange
 
     if (!shouldSchedulePatch(currentTargetRange, nextRange)) {
-      return
+      return false
     }
 
     queuedRange = nextRange
 
     if (patchFrameQueued) {
-      return
+      return true
     }
 
     patchFrameQueued = true
@@ -50,11 +55,16 @@ export function initializeScrollVirtualization(
       const rangeToApply = queuedRange
       queuedRange = null
       applyMountedRangeUpdate(state, rangeToApply)
+      dependencies.afterPatch?.(state)
     })
+
+    return true
   }
 
-  handleScroll()
-  state.scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+  schedulePatch()
+  state.scrollContainer.addEventListener('scroll', schedulePatch, { passive: true })
+
+  return { schedulePatch }
 }
 
 function createDefaultDependencies(): ScrollVirtualizationDependencies {
@@ -65,7 +75,7 @@ function createDefaultDependencies(): ScrollVirtualizationDependencies {
   }
 }
 
-function getMountedRangeForScrollPosition(
+export function getMountedRangeForScrollPosition(
   state: TranscriptSessionState,
 ): MountedRange | null {
   const viewportHeight = resolveViewportHeight(state.scrollContainer)
@@ -87,11 +97,18 @@ export function applyMountedRangeUpdate(
   const anchor = captureAnchorSnapshot(state.records, viewportRect)
 
   patchMountedRange(state, range.start, range.end)
-
   const correction =
     anchor === null
       ? 0
       : state.pendingScrollCorrection + resolveAnchorCorrection(anchor, viewportRect.top)
+
+  applyScrollCorrection(state.scrollContainer, correction)
+  state.pendingScrollCorrection = 0
+  state.anchor = captureAnchorSnapshot(state.records, resolveViewportRect(state.scrollContainer))
+}
+
+export function applyPendingAnchorCorrection(state: TranscriptSessionState): void {
+  const correction = state.anchor === null ? 0 : state.pendingScrollCorrection
 
   applyScrollCorrection(state.scrollContainer, correction)
   state.pendingScrollCorrection = 0

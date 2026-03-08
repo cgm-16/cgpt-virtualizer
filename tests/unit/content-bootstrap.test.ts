@@ -69,6 +69,14 @@ describe('selector resolution', () => {
   })
 })
 
+function createNoopResizeObserver() {
+  return {
+    disconnect() {},
+    observe() {},
+    unobserve() {},
+  }
+}
+
 function makeDocumentWithBubbles(bubbleCount: number): Document {
   const transcriptRoot = document.createElement('section')
   transcriptRoot.setAttribute('data-cgpt-transcript-root', '')
@@ -165,6 +173,7 @@ describe('transcript scan integration', () => {
 
   it('returns scanResult with activationEligible=true for 50 bubbles', () => {
     const result = bootstrapContentScript({
+      createResizeObserver: createNoopResizeObserver,
       document: makeDocumentWithBubbles(50),
       pathname: '/c/example',
       reportAvailability() {},
@@ -182,6 +191,7 @@ describe('transcript scan integration', () => {
     })
 
     const result = bootstrapContentScript({
+      createResizeObserver: createNoopResizeObserver,
       document: fixture.document,
       pathname: '/c/example',
       reportAvailability() {},
@@ -236,6 +246,7 @@ describe('transcript scan integration', () => {
     })
 
     const result = bootstrapContentScript({
+      createResizeObserver: createNoopResizeObserver,
       document: fixture.document,
       pathname: '/c/example',
       reportAvailability() {},

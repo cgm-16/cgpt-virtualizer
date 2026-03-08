@@ -188,21 +188,21 @@
 
 ## 9. ResizeObserver integration
 
-- [ ] Add `ResizeObserver` manager
-- [ ] Observe mounted bubbles only
-- [ ] Unobserve detached bubbles
-- [ ] Re-measure resized mounted bubbles
-- [ ] Ignore height deltas `< 1px`
-- [ ] Update BubbleRecord height
-- [ ] Rebuild prefix-sum suffix from changed index
-- [ ] Apply anchor-preserving correction where needed
-- [ ] Schedule patch if range boundaries change
-- [ ] Add integration tests for resize behavior
+- [x] Add `ResizeObserver` manager
+- [x] Observe mounted bubbles only
+- [x] Unobserve detached bubbles
+- [x] Re-measure resized mounted bubbles
+- [x] Ignore height deltas `< 1px`
+- [x] Update BubbleRecord height
+- [x] Rebuild prefix-sum suffix from changed index
+- [x] Apply anchor-preserving correction where needed
+- [x] Schedule patch if range boundaries change
+- [x] Add integration tests for resize behavior
 
 ### Acceptance criteria
-- [ ] Mounted bubble resize updates state
-- [ ] Detached bubbles are not observed
-- [ ] Anchor-preserving correction is applied when appropriate
+- [x] Mounted bubble resize updates state
+- [x] Detached bubbles are not observed
+- [x] Anchor-preserving correction is applied when appropriate
 
 ---
 
