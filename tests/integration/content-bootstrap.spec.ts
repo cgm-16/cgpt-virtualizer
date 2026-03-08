@@ -385,6 +385,59 @@ test('anchor 위 bubble resize는 읽기 위치를 유지한다', async ({ page 
     })
 })
 
+test('clean tail append burst는 quiet period 후 한 번만 패치한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+
+    if (transcriptRoot === null) {
+      throw new Error('transcript root fixture is missing')
+    }
+
+    const first = document.createElement('article')
+    first.setAttribute('data-cgpt-transcript-bubble', '')
+    first.setAttribute('style', 'display: block; height: 100px;')
+    first.textContent = 'Bubble 50'
+
+    const second = document.createElement('article')
+    second.setAttribute('data-cgpt-transcript-bubble', '')
+    second.setAttribute('style', 'display: block; height: 100px;')
+    second.textContent = 'Bubble 51'
+
+    ;(window as WindowWithTestState).__tailAppendNodes = [first, second]
+
+    transcriptRoot.append(first)
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+    transcriptRoot.append(second)
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
+          childCount: children.length,
+          detachedTailBubbleCount:
+            (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      bottomSpacerHeight: 'height: 4800px;',
+      childCount: 6,
+      detachedTailBubbleCount: 2,
+      rafCallCount: 2,
+    })
+})
+
 function renderFixtureHtml(requestPath: string): string {
   const url = new URL(`http://fixture${requestPath}`)
   const fixture = url.searchParams.get('fixture')
@@ -544,4 +597,5 @@ async function expectInitialMountedWindow(page: Page): Promise<void> {
 interface WindowWithTestState extends Window {
   __allBubbles: HTMLElement[]
   __rafCallCount: number
+  __tailAppendNodes: HTMLElement[]
 }

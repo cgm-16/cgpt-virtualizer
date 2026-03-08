@@ -33,3 +33,26 @@ export function rebuildPrefixSumsFromIndex(
 
   return rebuilt
 }
+
+export function extendPrefixSums(
+  prefixSums: number[],
+  appendedRecords: BubbleRecord[],
+): number[] {
+  if (appendedRecords.length === 0) {
+    return prefixSums.slice()
+  }
+
+  if (prefixSums.length === 0) {
+    return buildPrefixSums(appendedRecords)
+  }
+
+  const extended = prefixSums.slice()
+  let total = extended[extended.length - 1] ?? 0
+
+  for (const record of appendedRecords) {
+    total += record.measuredHeight
+    extended.push(total)
+  }
+
+  return extended
+}

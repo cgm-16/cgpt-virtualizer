@@ -1,9 +1,14 @@
 import { createReportContentAvailabilityMessage } from '../shared/messages.ts'
 import type { ContentAvailability } from '../shared/types.ts'
 import { isSupportedTranscriptPath } from '../shared/routes.ts'
+import {
+  createAppendObserverManager,
+  type MutationObserverLike,
+} from './append.ts'
 import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
+import { requestDirtyRebuild } from './rebuild.ts'
 import {
   createResizeObserverManager,
   type ResizeObserverLike,
@@ -20,11 +25,14 @@ import {
 import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
 
 export interface ContentBootstrapDependencies {
+  clearTimeout?(handle: number): void
+  createMutationObserver?(callback: MutationCallback): MutationObserverLike
   createResizeObserver?(callback: ResizeObserverCallback): ResizeObserverLike
   document: Document
   pathname: string
   reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
   requestAnimationFrame?(callback: FrameRequestCallback): number
+  setTimeout?(callback: () => void, delay: number): number
 }
 
 export interface ContentBootstrapResult {
@@ -50,10 +58,12 @@ export function bootstrapContentScript(
       ? createTranscriptSessionState(selectors.scrollContainer, scanResult)
       : null
 
-  if (sessionState !== null) {
+  if (sessionState !== null && selectors !== null) {
+    let appendObserverManager: ReturnType<typeof createAppendObserverManager> | null = null
     let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
     const scrollController = initializeScrollVirtualization(sessionState, {
       afterPatch() {
+        appendObserverManager?.flushPendingMutationRecords()
         resizeObserverManager?.refreshObservedRecords()
       },
       requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
@@ -68,6 +78,20 @@ export function bootstrapContentScript(
       schedulePatch() {
         return scrollController.schedulePatch()
       },
+    })
+    appendObserverManager = createAppendObserverManager(sessionState, {
+      clearTimeout: dependencies.clearTimeout ?? window.clearTimeout.bind(window),
+      createMutationObserver:
+        dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+      isTranscriptBubble(node): node is Element {
+        return node instanceof Element && node.matches(selectors.bubbleSelector)
+      },
+      measure: measureBubble,
+      requestDirtyRebuild,
+      schedulePatch(options) {
+        return scrollController.schedulePatch(options)
+      },
+      setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
     })
     resizeObserverManager.refreshObservedRecords()
   }
@@ -98,6 +122,7 @@ function createTranscriptSessionState(
 
   return {
     anchor: null,
+    dirtyRebuildReason: null,
     transcriptRoot: scanResult.transcriptRoot,
     pendingScrollCorrection: 0,
     scrollContainer,

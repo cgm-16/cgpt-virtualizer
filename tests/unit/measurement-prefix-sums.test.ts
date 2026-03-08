@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { measureBubble } from '../../src/content/measure.ts'
 import {
   buildPrefixSums,
+  extendPrefixSums,
   rebuildPrefixSumsFromIndex,
 } from '../../src/content/prefix-sums.ts'
 import type { BubbleRecord } from '../../src/content/state.ts'
@@ -83,5 +84,27 @@ describe('rebuildPrefixSumsFromIndex', () => {
     const stalePrefixSums = [10]
 
     expect(rebuildPrefixSumsFromIndex(stalePrefixSums, records, 1)).toEqual([10, 30])
+  })
+})
+
+describe('extendPrefixSums', () => {
+  it('extends the existing cumulative heights with appended records', () => {
+    const existingPrefixSums = [10, 30]
+    const appendedRecords = [
+      makeBubbleRecord(2, 5.5),
+      makeBubbleRecord(3, 9.25),
+    ]
+
+    expect(extendPrefixSums(existingPrefixSums, appendedRecords)).toEqual([10, 30, 35.5, 44.75])
+    expect(existingPrefixSums).toEqual([10, 30])
+  })
+
+  it('falls back to building prefix sums when the existing list is empty', () => {
+    const appendedRecords = [
+      makeBubbleRecord(0, 12),
+      makeBubbleRecord(1, 8),
+    ]
+
+    expect(extendPrefixSums([], appendedRecords)).toEqual([12, 20])
   })
 })

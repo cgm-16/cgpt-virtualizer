@@ -1,4 +1,5 @@
 import type { AnchorSnapshot } from './anchor.ts'
+import type { DirtyRebuildReason } from './rebuild.ts'
 
 export interface BubbleRecord {
   index: number
@@ -20,6 +21,7 @@ export interface TranscriptSessionState {
   prefixSums: number[]
   mountedRange: MountedRange | null
   anchor: AnchorSnapshot | null
+  dirtyRebuildReason: DirtyRebuildReason | null
   pendingScrollCorrection: number
 }
 
