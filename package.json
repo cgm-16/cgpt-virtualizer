@@ -9,7 +9,7 @@
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "vitest run",
     "pretest:integration": "pnpm run build",
-    "test:integration": "playwright test"
+    "test:integration": "env -u NO_COLOR playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

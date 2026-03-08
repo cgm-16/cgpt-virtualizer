@@ -507,6 +507,56 @@ test('streaming 중 scroll은 mounted range 패치를 멈춘다', async ({ page 
     })
 })
 
+test('streaming 종료 후에는 scroll-driven mounted range patch가 다시 동작한다', async ({
+  page,
+}) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (scrollContainer === null || streamingIndicator === null) {
+      throw new Error('streaming fixture is missing')
+    }
+
+    streamingIndicator.removeAttribute('hidden')
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+
+    streamingIndicator.setAttribute('hidden', '')
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          childCount: children.length,
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          placeholderCount:
+            transcriptRoot?.querySelectorAll('[data-cgpt-streaming-gap-placeholder]').length ?? 0,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      childCount: 9,
+      firstBubbleText: 'Bubble 0',
+      lastBubbleText: 'Bubble 6',
+      placeholderCount: 0,
+      rafCallCount: 3,
+    })
+})
+
 test('streaming gap에 진입하면 placeholder를 표시하고 종료 시 제거한다', async ({ page }) => {
   await installFixtureRoutes(page)
   await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')

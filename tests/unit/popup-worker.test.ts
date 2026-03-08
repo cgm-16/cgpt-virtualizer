@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { handleContentMessage } from '../../src/background/content-controller.ts'
 import {
   REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
   GET_POPUP_STATE_MESSAGE_TYPE,
   POPUP_STATE_MESSAGE_TYPE,
   SET_TAB_ENABLED_MESSAGE_TYPE,
+  createGetTabEnabledMessage,
   createGetPopupStateMessage,
   createPopupStateMessage,
   createReportContentAvailabilityMessage,
@@ -14,6 +16,7 @@ import {
 } from '../../src/shared/messages.ts'
 import { handlePopupMessage } from '../../src/background/popup-controller.ts'
 import { createPopupState, createTabStateStore } from '../../src/background/tab-state.ts'
+import { bootstrapContentEntry } from '../../src/content/startup.ts'
 import { createPopupViewModel } from '../../src/popup-view.ts'
 
 describe('popup-worker message contracts', () => {
@@ -241,6 +244,89 @@ describe('popup controller', () => {
       status: 'Unavailable',
       type: POPUP_STATE_MESSAGE_TYPE,
     })
+  })
+})
+
+describe('toggle flow regression', () => {
+  it('활성 탭 on/off 토글이 content startup gating까지 일관되게 반영된다', async () => {
+    const store = createTabStateStore()
+    const refreshedTabIds: number[] = []
+
+    store.setTabAvailability(7, 'available')
+
+    const getCurrentTabVirtualizationEnabled = async () => {
+      const response = await handleContentMessage(createGetTabEnabledMessage(), 7, {
+        refreshTab: async () => {},
+        tabStateStore: store,
+      })
+
+      if (response === null) {
+        throw new Error('tab enabled 응답이 필요합니다.')
+      }
+
+      return response.enabled
+    }
+
+    await expect(
+      handlePopupMessage(createSetTabEnabledMessage(true), {
+        getActiveTabId: async () => 7,
+        refreshActiveTab: async (tabId) => {
+          refreshedTabIds.push(tabId)
+        },
+        tabStateStore: store,
+      }),
+    ).resolves.toEqual({
+      enabled: true,
+      status: 'On',
+      type: POPUP_STATE_MESSAGE_TYPE,
+    })
+
+    let reports: Array<ReturnType<typeof createReportContentAvailabilityMessage>> = []
+    let startCount = 0
+
+    await bootstrapContentEntry({
+      getCurrentTabVirtualizationEnabled,
+      reportAvailability(message) {
+        reports.push(message)
+      },
+      startContentRuntime() {
+        startCount += 1
+      },
+    })
+
+    expect(startCount).toBe(1)
+    expect(reports).toEqual([])
+
+    await expect(
+      handlePopupMessage(createSetTabEnabledMessage(false), {
+        getActiveTabId: async () => 7,
+        refreshActiveTab: async (tabId) => {
+          refreshedTabIds.push(tabId)
+        },
+        tabStateStore: store,
+      }),
+    ).resolves.toEqual({
+      enabled: false,
+      status: 'Off',
+      type: POPUP_STATE_MESSAGE_TYPE,
+    })
+
+    reports = []
+    startCount = 0
+
+    await bootstrapContentEntry({
+      getCurrentTabVirtualizationEnabled,
+      reportAvailability(message) {
+        reports.push(message)
+      },
+      startContentRuntime() {
+        startCount += 1
+      },
+    })
+
+    expect(startCount).toBe(0)
+    expect(reports).toEqual([createReportContentAvailabilityMessage('idle')])
+    expect(refreshedTabIds).toEqual([7, 7])
   })
 })
 

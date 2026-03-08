@@ -20,6 +20,7 @@ import {
   handleSelectorStartupFailure,
   reportUnavailableStatus,
 } from './failure.ts'
+import { reportVirtualizationMetrics } from './debug.ts'
 import {
   DEFAULT_MEMORY_GUARD_THRESHOLD,
   estimateDetachedCachePressure,
@@ -150,6 +151,8 @@ export function bootstrapContentScript(
     }
 
     const handleMidSessionSelectorFailure = () => {
+      reportVirtualizationMetrics('selector-failure', activeSessionState)
+
       if (!teardownSession()) {
         return false
       }
@@ -164,6 +167,7 @@ export function bootstrapContentScript(
         appendObserverManager?.flushPendingMutationRecords()
         structuralRebuildObserverManager?.flushPendingMutationRecords()
         resizeObserverManager?.refreshObservedRecords()
+        reportVirtualizationMetrics('patch-applied', activeSessionState)
         maybeHandleMemoryGuard()
       },
       requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
@@ -175,6 +179,8 @@ export function bootstrapContentScript(
       if (!shouldDisableVirtualizationForMemory(pressure, memoryGuardThreshold)) {
         return false
       }
+
+      reportVirtualizationMetrics('memory-guard-trip', activeSessionState)
 
       if (!teardownSession()) {
         return false

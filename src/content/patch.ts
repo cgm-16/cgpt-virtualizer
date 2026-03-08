@@ -1,3 +1,4 @@
+import { assertMountedWindowBounds, isDebugModeEnabled } from './debug.ts'
 import type { BubbleRecord, TranscriptSessionState } from './state.ts'
 
 const TOP_SPACER_ATTRIBUTE = 'data-cgpt-top-spacer'
@@ -96,6 +97,10 @@ export function patchMountedRange(
   state.transcriptRoot.insertBefore(fragment, bottomSpacer)
   updateMountedFlags(state.records, start, end)
   state.mountedRange = { start, end }
+
+  if (isDebugModeEnabled()) {
+    assertMountedWindowBounds(state, start, end)
+  }
 }
 
 function detachMountedRangeOutsideNextWindow(
