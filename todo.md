@@ -90,22 +90,22 @@
 
 ## 4. Transcript scanning and activation threshold
 
-- [ ] Implement transcript scan module
-- [ ] Resolve transcript root
-- [ ] Collect matched transcript bubbles in DOM order
-- [ ] Return scan result object with:
-  - [ ] transcript root
-  - [ ] bubbles array
-  - [ ] bubble count
-  - [ ] activation eligibility
-- [ ] Enforce activation threshold at 50 matched bubbles
-- [ ] Add integration tests for 0 / 49 / 50 bubble cases
-- [ ] Add tests for bubble ordering
+- [x] Implement transcript scan module
+- [x] Resolve transcript root
+- [x] Collect matched transcript bubbles in DOM order
+- [x] Return scan result object with:
+  - [x] transcript root
+  - [x] bubbles array
+  - [x] bubble count
+  - [x] activation eligibility
+- [x] Enforce activation threshold at 50 matched bubbles
+- [x] Add integration tests for 0 / 49 / 50 bubble cases
+- [x] Add tests for bubble ordering
 
 ### Acceptance criteria
-- [ ] 49 bubbles => inactive
-- [ ] 50 bubbles => eligible
-- [ ] Bubble ordering is stable and correct
+- [x] 49 bubbles => inactive
+- [x] 50 bubbles => eligible
+- [x] Bubble ordering is stable and correct
 
 ---
 
