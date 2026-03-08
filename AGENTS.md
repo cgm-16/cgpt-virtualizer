@@ -56,11 +56,6 @@ Rule #1: If you want exception to ANY rule, YOU MUST STOP and get explicit permi
 - Never ignore system or test output - logs contain critical information
 - Test output must be pristine to pass - capture and test expected errors
 
-## Issue tracking
-
-- Use TodoWrite tool for task management
-- Never discard tasks without explicit approval
-
 ## Agent Delegation
 
 - The main conversation acts as COORDINATOR — it plans, decides, synthesizes, integrates, and handles Ori-facing judgment
