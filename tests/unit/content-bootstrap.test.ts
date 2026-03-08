@@ -58,6 +58,7 @@ describe('selector resolution', () => {
 
     expect(result.availability).toBe('idle')
     expect(result.scanResult).toBeNull()
+    expect(result.sessionState).toBeNull()
 
     expect(reports).toEqual([
       {
@@ -100,6 +101,7 @@ describe('transcript scan integration', () => {
     })
 
     expect(result.scanResult).toBeNull()
+    expect(result.sessionState).toBeNull()
   })
 
   it('returns null scanResult when selectors are missing', () => {
@@ -113,6 +115,7 @@ describe('transcript scan integration', () => {
 
     expect(result.availability).toBe('unavailable')
     expect(result.scanResult).toBeNull()
+    expect(result.sessionState).toBeNull()
   })
 
   it('returns scanResult with activationEligible=false for 0 bubbles', () => {
@@ -127,6 +130,7 @@ describe('transcript scan integration', () => {
 
     expect(result.availability).toBe('inactive')
     expect(result.scanResult).not.toBeNull()
+    expect(result.sessionState).toBeNull()
     expect(result.scanResult?.bubbleCount).toBe(0)
     expect(result.scanResult?.activationEligible).toBe(false)
     expect(reports).toEqual([
@@ -148,6 +152,7 @@ describe('transcript scan integration', () => {
     })
 
     expect(result.availability).toBe('inactive')
+    expect(result.sessionState).toBeNull()
     expect(result.scanResult?.bubbleCount).toBe(49)
     expect(result.scanResult?.activationEligible).toBe(false)
     expect(reports).toEqual([
@@ -169,4 +174,80 @@ describe('transcript scan integration', () => {
     expect(result.scanResult?.bubbleCount).toBe(50)
     expect(result.scanResult?.activationEligible).toBe(true)
   })
+
+  it('creates ordered session state with measured heights for eligible transcripts', () => {
+    const bubbleHeights = Array.from({ length: 50 }, (_, index) => index + 0.5)
+    const fixture = makeMeasuredDocumentFixture(bubbleHeights)
+
+    const result = bootstrapContentScript({
+      document: fixture.document,
+      pathname: '/c/example',
+      reportAvailability() {},
+    })
+
+    expect(result.availability).toBe('available')
+    expect(result.sessionState).not.toBeNull()
+    expect(result.sessionState?.transcriptRoot).toBe(fixture.transcriptRoot)
+    expect(result.sessionState?.scrollContainer).toBe(fixture.scrollContainer)
+    expect(result.sessionState?.records).toHaveLength(50)
+    expect(result.sessionState?.records[0]).toMatchObject({
+      index: 0,
+      measuredHeight: 0.5,
+      mounted: false,
+      pinned: false,
+    })
+    expect(result.sessionState?.records[1]).toMatchObject({
+      index: 1,
+      measuredHeight: 1.5,
+      mounted: false,
+      pinned: false,
+    })
+    expect(result.sessionState?.records[49]).toMatchObject({
+      index: 49,
+      measuredHeight: 49.5,
+      mounted: false,
+      pinned: false,
+    })
+    expect(result.sessionState?.records[0]?.node).toBe(fixture.bubbles[0])
+    expect(result.sessionState?.records[1]?.node).toBe(fixture.bubbles[1])
+    expect(result.sessionState?.records[49]?.node).toBe(fixture.bubbles[49])
+    expect(result.sessionState?.prefixSums[0]).toBe(0.5)
+    expect(result.sessionState?.prefixSums[1]).toBe(2)
+    expect(result.sessionState?.prefixSums[49]).toBe(1250)
+  })
 })
+
+function makeMeasuredDocumentFixture(bubbleHeights: number[]): {
+  bubbles: HTMLElement[]
+  document: Document
+  scrollContainer: HTMLElement
+  transcriptRoot: HTMLElement
+} {
+  const transcriptRoot = document.createElement('section')
+  transcriptRoot.setAttribute('data-cgpt-transcript-root', '')
+  const scrollContainer = document.createElement('main')
+  scrollContainer.setAttribute('data-cgpt-scroll-container', '')
+  const bubbles = bubbleHeights.map((height) => {
+    const bubble = document.createElement('article')
+    bubble.setAttribute('data-cgpt-transcript-bubble', '')
+    bubble.getBoundingClientRect = () => ({ height }) as DOMRect
+    transcriptRoot.append(bubble)
+    return bubble
+  })
+  const streamingIndicator = document.createElement('div')
+  streamingIndicator.setAttribute('data-cgpt-streaming-indicator', '')
+
+  const body = document.createElement('body')
+  body.append(scrollContainer, transcriptRoot, streamingIndicator)
+
+  return {
+    bubbles,
+    document: {
+      querySelector(selector: string) {
+        return body.querySelector(selector)
+      },
+    } as unknown as Document,
+    scrollContainer,
+    transcriptRoot,
+  }
+}

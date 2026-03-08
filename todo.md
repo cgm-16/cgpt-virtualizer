@@ -111,19 +111,19 @@
 
 ## 5. Measurement and prefix sums
 
-- [ ] Define `BubbleRecord`
-- [ ] Add measurement wrapper using `getBoundingClientRect().height`
-- [ ] Store floating-point heights
-- [ ] Build prefix-sum array from BubbleRecords
-- [ ] Implement suffix rebuild from changed index
-- [ ] Define transcript session state shape
-- [ ] Wire scan -> records -> measurement -> prefix sums
-- [ ] Add unit tests for prefix sums and suffix rebuild
+- [x] Define `BubbleRecord`
+- [x] Add measurement wrapper using `getBoundingClientRect().height`
+- [x] Store floating-point heights
+- [x] Build prefix-sum array from BubbleRecords
+- [x] Implement suffix rebuild from changed index
+- [x] Define transcript session state shape
+- [x] Wire scan -> records -> measurement -> prefix sums
+- [x] Add unit tests for prefix sums and suffix rebuild
 
 ### Acceptance criteria
-- [ ] All eligible bubbles are measured into ordered records
-- [ ] Prefix sums are correct
-- [ ] Suffix updates work correctly after a changed index
+- [x] All eligible bubbles are measured into ordered records
+- [x] Prefix sums are correct
+- [x] Suffix updates work correctly after a changed index
 
 ---
 
