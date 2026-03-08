@@ -22,11 +22,14 @@ export function bootstrapContentScript(
   const selectors = isSupportedTranscriptPath(dependencies.pathname)
     ? resolveSelectors(dependencies.document)
     : null
-  const availability = resolveAvailability(dependencies.pathname, selectors)
+  const scanResult = selectors !== null ? scanTranscript(selectors) : null
+  const baseAvailability = resolveAvailability(dependencies.pathname, selectors)
+  const availability =
+    baseAvailability === 'available' && scanResult !== null && !scanResult.activationEligible
+      ? 'inactive'
+      : baseAvailability
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
-
-  const scanResult = selectors !== null ? scanTranscript(selectors) : null
 
   return { availability, scanResult }
 }

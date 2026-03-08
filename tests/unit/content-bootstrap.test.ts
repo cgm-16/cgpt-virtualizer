@@ -116,28 +116,46 @@ describe('transcript scan integration', () => {
   })
 
   it('returns scanResult with activationEligible=false for 0 bubbles', () => {
+    const reports: unknown[] = []
     const result = bootstrapContentScript({
       document: makeDocumentWithBubbles(0),
       pathname: '/c/example',
-      reportAvailability() {},
+      reportAvailability(message) {
+        reports.push(message)
+      },
     })
 
-    expect(result.availability).toBe('available')
+    expect(result.availability).toBe('inactive')
     expect(result.scanResult).not.toBeNull()
     expect(result.scanResult?.bubbleCount).toBe(0)
     expect(result.scanResult?.activationEligible).toBe(false)
+    expect(reports).toEqual([
+      {
+        availability: 'inactive',
+        type: 'runtime/report-content-availability',
+      },
+    ])
   })
 
   it('returns scanResult with activationEligible=false for 49 bubbles', () => {
+    const reports: unknown[] = []
     const result = bootstrapContentScript({
       document: makeDocumentWithBubbles(49),
       pathname: '/c/example',
-      reportAvailability() {},
+      reportAvailability(message) {
+        reports.push(message)
+      },
     })
 
-    expect(result.availability).toBe('available')
+    expect(result.availability).toBe('inactive')
     expect(result.scanResult?.bubbleCount).toBe(49)
     expect(result.scanResult?.activationEligible).toBe(false)
+    expect(reports).toEqual([
+      {
+        availability: 'inactive',
+        type: 'runtime/report-content-availability',
+      },
+    ])
   })
 
   it('returns scanResult with activationEligible=true for 50 bubbles', () => {

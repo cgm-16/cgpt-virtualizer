@@ -96,6 +96,7 @@ export function isContentToWorkerMessage(value: unknown): value is ContentToWork
 
   return (
     value.availability === 'idle' ||
+    value.availability === 'inactive' ||
     value.availability === 'available' ||
     value.availability === 'unavailable'
   )
