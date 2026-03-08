@@ -116,6 +116,7 @@ function makeSessionFixture(
     scrollContainer,
     sessionState: {
       anchor: null,
+      dirtyRebuildReason: null,
       mountedRange: null,
       pendingScrollCorrection: 0,
       prefixSums,

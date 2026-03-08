@@ -19,7 +19,7 @@ export interface ResizeObserverManagerDependencies {
   applyPendingCorrection(): void
   createResizeObserver(callback: ResizeObserverCallback): ResizeObserverLike
   measure(node: Element): number
-  schedulePatch(): boolean
+  schedulePatch(options?: { force?: boolean }): boolean
 }
 
 export function shouldIgnoreHeightDelta(
@@ -41,6 +41,10 @@ export function createResizeObserverManager(
 
   const refreshObservedRecords = () => {
     for (const record of state.records) {
+      if (!recordsByNode.has(record.node)) {
+        recordsByNode.set(record.node, record)
+      }
+
       const isObserved = observedNodes.has(record.node)
       const shouldObserve = record.mounted && record.node.isConnected
 
@@ -93,7 +97,7 @@ export function createResizeObserverManager(
     }
 
     dependencies.applyPendingCorrection()
-    dependencies.schedulePatch()
+    dependencies.schedulePatch({ force: true })
   }
 
   return {

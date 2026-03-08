@@ -9,8 +9,12 @@ import { patchMountedRange } from './patch.ts'
 import { findRangeByScrollPosition, shouldSchedulePatch } from './range.ts'
 import type { MountedRange, TranscriptSessionState } from './state.ts'
 
+export interface SchedulePatchOptions {
+  force?: boolean
+}
+
 export interface ScrollVirtualizationController {
-  schedulePatch(): boolean
+  schedulePatch(options?: SchedulePatchOptions): boolean
 }
 
 export interface ScrollVirtualizationDependencies {
@@ -25,7 +29,7 @@ export function initializeScrollVirtualization(
   let patchFrameQueued = false
   let queuedRange: MountedRange | null = null
 
-  const schedulePatch = () => {
+  const schedulePatch = (options: SchedulePatchOptions = {}) => {
     const nextRange = getMountedRangeForScrollPosition(state)
 
     if (nextRange === null) {
@@ -34,7 +38,7 @@ export function initializeScrollVirtualization(
 
     const currentTargetRange = queuedRange ?? state.mountedRange
 
-    if (!shouldSchedulePatch(currentTargetRange, nextRange)) {
+    if (!options.force && !shouldSchedulePatch(currentTargetRange, nextRange)) {
       return false
     }
 
@@ -62,7 +66,13 @@ export function initializeScrollVirtualization(
   }
 
   schedulePatch()
-  state.scrollContainer.addEventListener('scroll', schedulePatch, { passive: true })
+  state.scrollContainer.addEventListener(
+    'scroll',
+    () => {
+      schedulePatch()
+    },
+    { passive: true },
+  )
 
   return { schedulePatch }
 }
