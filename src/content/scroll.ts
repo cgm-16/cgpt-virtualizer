@@ -1,3 +1,9 @@
+import {
+  applyScrollCorrection,
+  captureAnchorSnapshot,
+  resolveAnchorCorrection,
+  type ViewportRect,
+} from './anchor.ts'
 import { OVERSCAN_VIEWPORT_COUNT } from '../shared/constants.ts'
 import { patchMountedRange } from './patch.ts'
 import { findRangeByScrollPosition, shouldSchedulePatch } from './range.ts'
@@ -43,7 +49,7 @@ export function initializeScrollVirtualization(
 
       const rangeToApply = queuedRange
       queuedRange = null
-      patchMountedRange(state, rangeToApply.start, rangeToApply.end)
+      applyMountedRangeUpdate(state, rangeToApply)
     })
   }
 
@@ -73,6 +79,35 @@ function getMountedRangeForScrollPosition(
   )
 }
 
+export function applyMountedRangeUpdate(
+  state: TranscriptSessionState,
+  range: MountedRange,
+): void {
+  const viewportRect = resolveViewportRect(state.scrollContainer)
+  const anchor = captureAnchorSnapshot(state.records, viewportRect)
+
+  patchMountedRange(state, range.start, range.end)
+
+  const correction =
+    anchor === null
+      ? 0
+      : state.pendingScrollCorrection + resolveAnchorCorrection(anchor, viewportRect.top)
+
+  applyScrollCorrection(state.scrollContainer, correction)
+  state.pendingScrollCorrection = 0
+  state.anchor = captureAnchorSnapshot(state.records, resolveViewportRect(state.scrollContainer))
+}
+
 function resolveViewportHeight(scrollContainer: HTMLElement): number {
   return scrollContainer.clientHeight || scrollContainer.getBoundingClientRect().height
+}
+
+function resolveViewportRect(scrollContainer: HTMLElement): ViewportRect {
+  const rect = scrollContainer.getBoundingClientRect()
+  const height = resolveViewportHeight(scrollContainer)
+
+  return {
+    bottom: rect.top + height,
+    top: rect.top,
+  }
 }

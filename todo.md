@@ -171,18 +171,18 @@
 
 ## 8. Anchor model and scroll correction
 
-- [ ] Implement anchor selection:
-  - [ ] first mounted bubble intersecting viewport
-- [ ] Implement anchor offset calculation
-- [ ] Implement correction accumulation rules
-- [ ] Handle no-anchor fallback safely
-- [ ] Integrate anchor recomputation into patch frame flow
-- [ ] Add unit tests for anchor math and correction logic
+- [x] Implement anchor selection:
+  - [x] first mounted bubble intersecting viewport
+- [x] Implement anchor offset calculation
+- [x] Implement correction accumulation rules
+- [x] Handle no-anchor fallback safely
+- [x] Integrate anchor recomputation into patch frame flow
+- [x] Add unit tests for anchor math and correction logic
 
 ### Acceptance criteria
-- [ ] Anchor bubble selection is correct
-- [ ] Offset calculation is correct
-- [ ] No-anchor case behaves safely
+- [x] Anchor bubble selection is correct
+- [x] Offset calculation is correct
+- [x] No-anchor case behaves safely
 
 ---
 

@@ -92,7 +92,9 @@ function makeSessionFixture(heights: number[]): {
   return {
     bubbles,
     sessionState: {
+      anchor: null,
       mountedRange: null,
+      pendingScrollCorrection: 0,
       prefixSums: [10, 30, 60, 100].slice(0, heights.length),
       records,
       scrollContainer,
