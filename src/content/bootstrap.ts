@@ -7,7 +7,6 @@ import { buildPrefixSums } from './prefix-sums.ts'
 import { resolveSelectors } from './selectors.ts'
 import {
   buildBubbleRecords,
-  createSessionState,
   type TranscriptSessionState,
 } from './state.ts'
 import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
@@ -62,10 +61,10 @@ function createTranscriptSessionState(
 ): TranscriptSessionState {
   const records = buildBubbleRecords(scanResult.bubbles, measureBubble)
 
-  return createSessionState(
-    scanResult.transcriptRoot,
+  return {
+    transcriptRoot: scanResult.transcriptRoot,
     scrollContainer,
     records,
-    buildPrefixSums(records),
-  )
+    prefixSums: buildPrefixSums(records),
+  }
 }

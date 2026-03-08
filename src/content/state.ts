@@ -26,16 +26,3 @@ export function buildBubbleRecords(
   }))
 }
 
-export function createSessionState(
-  transcriptRoot: HTMLElement,
-  scrollContainer: HTMLElement,
-  records: BubbleRecord[],
-  prefixSums: number[],
-): TranscriptSessionState {
-  return {
-    transcriptRoot,
-    scrollContainer,
-    records,
-    prefixSums,
-  }
-}
