@@ -3,8 +3,8 @@ import type { ContentAvailability } from '../shared/types.ts'
 import { isSupportedTranscriptPath } from '../shared/routes.ts'
 import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
-import { patchMountedRange } from './patch.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
+import { initializeScrollVirtualization } from './scroll.ts'
 import { resolveSelectors } from './selectors.ts'
 import {
   buildBubbleRecords,
@@ -16,6 +16,7 @@ export interface ContentBootstrapDependencies {
   document: Document
   pathname: string
   reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
+  requestAnimationFrame?(callback: FrameRequestCallback): number
 }
 
 export interface ContentBootstrapResult {
@@ -42,7 +43,9 @@ export function bootstrapContentScript(
       : null
 
   if (sessionState !== null) {
-    patchMountedRange(sessionState, 0, sessionState.records.length - 1)
+    initializeScrollVirtualization(sessionState, {
+      requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
+    })
   }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
@@ -56,6 +59,9 @@ function createDefaultDependencies(): ContentBootstrapDependencies {
     pathname: window.location.pathname,
     reportAvailability(message) {
       chrome.runtime.sendMessage(message)
+    },
+    requestAnimationFrame(callback) {
+      return window.requestAnimationFrame(callback)
     },
   }
 }
@@ -71,5 +77,6 @@ function createTranscriptSessionState(
     scrollContainer,
     records,
     prefixSums: buildPrefixSums(records),
+    mountedRange: null,
   }
 }

@@ -150,22 +150,22 @@
 
 ## 7. Scroll virtualization
 
-- [ ] Implement binary-search range calculator
-- [ ] Add overscan:
-  - [ ] 1 viewport above
-  - [ ] 1 viewport below
-- [ ] Add current mounted range tracking
-- [ ] Add cheap scroll-path boundary check
-- [ ] Add `requestAnimationFrame` patch scheduler
-- [ ] Prevent duplicate queued patch frames
-- [ ] Run initial range computation and patch on activation
-- [ ] Add unit tests for range lookup
-- [ ] Add integration tests for scroll-triggered range changes
+- [x] Implement binary-search range calculator
+- [x] Add overscan:
+  - [x] 1 viewport above
+  - [x] 1 viewport below
+- [x] Add current mounted range tracking
+- [x] Add cheap scroll-path boundary check
+- [x] Add `requestAnimationFrame` patch scheduler
+- [x] Prevent duplicate queued patch frames
+- [x] Run initial range computation and patch on activation
+- [x] Add unit tests for range lookup
+- [x] Add integration tests for scroll-triggered range changes
 
 ### Acceptance criteria
-- [ ] Initial activation mounts the expected range
-- [ ] Scroll updates mounted range when needed
-- [ ] No-op scroll does not schedule unnecessary work
+- [x] Initial activation mounts the expected range
+- [x] Scroll updates mounted range when needed
+- [x] No-op scroll does not schedule unnecessary work
 
 ---
 

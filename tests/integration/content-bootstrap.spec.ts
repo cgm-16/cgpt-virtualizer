@@ -112,6 +112,7 @@ test('bubble이 50개일 때 spacer와 전체 mounted range를 초기 패치한�
 
         return {
           childCount: children.length,
+          bottomSpacerHeight: children.at(-1)?.getAttribute('style') ?? null,
           firstChild: children[0]?.getAttribute('data-cgpt-top-spacer') ?? null,
           lastChild: children.at(-1)?.getAttribute('data-cgpt-bottom-spacer') ?? null,
           firstBubbleText: children[1]?.textContent ?? null,
@@ -120,12 +121,91 @@ test('bubble이 50개일 때 spacer와 전체 mounted range를 초기 패치한�
       }),
     )
     .toEqual({
-      childCount: 52,
+      bottomSpacerHeight: 'height: 4600px;',
+      childCount: 6,
       firstBubbleText: 'Bubble 0',
       firstChild: '',
-      lastBubbleText: 'Bubble 49',
+      lastBubbleText: 'Bubble 3',
       lastChild: '',
     })
+})
+
+test('스크롤로 mounted range가 바뀌면 다음 frame에서만 패치한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expect
+    .poll(async () => page.evaluate(() => (window as WindowWithTestState).__rafCallCount))
+    .toBe(1)
+
+  await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          rafCallCount: (window as WindowWithTestState).__rafCallCount,
+        }
+      }),
+    )
+    .toEqual({
+      firstBubbleText: 'Bubble 0',
+      lastBubbleText: 'Bubble 6',
+      rafCallCount: 2,
+    })
+})
+
+test('range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expect
+    .poll(async () => page.evaluate(() => (window as WindowWithTestState).__rafCallCount))
+    .toBe(1)
+
+  await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+  })
+
+  await expect
+    .poll(async () => page.evaluate(() => (window as WindowWithTestState).__rafCallCount))
+    .toBe(2)
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+
+    if (scrollContainer === null) {
+      throw new Error('scroll container fixture is missing')
+    }
+
+    scrollContainer.scrollTop = 280
+    scrollContainer.dispatchEvent(new Event('scroll'))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+  })
+
+  expect(await page.evaluate(() => (window as WindowWithTestState).__rafCallCount)).toBe(2)
 })
 
 function renderFixtureHtml(requestPath: string): string {
@@ -142,6 +222,12 @@ function renderFixtureHtml(requestPath: string): string {
     ${renderFixtureBody(fixture)}
     <script>
       window.__reportedMessages = []
+      window.__rafCallCount = 0
+      const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window)
+      window.requestAnimationFrame = function requestAnimationFrameWrapper(callback) {
+        window.__rafCallCount += 1
+        return originalRequestAnimationFrame(callback)
+      }
       window.chrome = {
         runtime: {
           lastError: undefined,
@@ -170,19 +256,19 @@ function renderFixtureHtml(requestPath: string): string {
 function renderBubbles(count: number): string {
   return Array.from(
     { length: count },
-    (_, index) => `<article data-cgpt-transcript-bubble>Bubble ${index}</article>`,
+    (_, index) => `<article data-cgpt-transcript-bubble style="display: block; height: 100px;">Bubble ${index}</article>`,
   ).join('\n          ')
 }
 
 function renderFixtureBody(fixture: string | null): string {
   if (fixture === 'available') {
     return `
-      <main data-cgpt-scroll-container>
+      <main data-cgpt-scroll-container style="height: 200px; overflow-y: auto;">
         <section data-cgpt-transcript-root>
-          <article data-cgpt-transcript-bubble>Bubble</article>
+          <article data-cgpt-transcript-bubble style="display: block; height: 100px;">Bubble</article>
         </section>
+        <div data-cgpt-streaming-indicator hidden></div>
       </main>
-      <div data-cgpt-streaming-indicator hidden></div>
     `
   }
 
@@ -195,12 +281,12 @@ function renderFixtureBody(fixture: string | null): string {
   if (fixture === 'bubble-0' || fixture === 'bubble-49' || fixture === 'bubble-50') {
     const count = fixture === 'bubble-0' ? 0 : fixture === 'bubble-49' ? 49 : 50
     return `
-      <main data-cgpt-scroll-container>
+      <main data-cgpt-scroll-container style="height: 200px; overflow-y: auto;">
         <section data-cgpt-transcript-root>
           ${renderBubbles(count)}
         </section>
+        <div data-cgpt-streaming-indicator hidden></div>
       </main>
-      <div data-cgpt-streaming-indicator hidden></div>
     `
   }
 
@@ -254,4 +340,8 @@ async function installFixtureRoutes(page: Page): Promise<void> {
       status: 200,
     })
   })
+}
+
+interface WindowWithTestState extends Window {
+  __rafCallCount: number
 }
