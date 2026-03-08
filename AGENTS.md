@@ -63,10 +63,18 @@ Rule #1: If you want exception to ANY rule, YOU MUST STOP and get explicit permi
 
 ## Agent Delegation
 
-- The main conversation acts as coordinator; spawned agents handle bounded support tasks
-- Prefer spawning agents for: parallel research, batch operations, verbose output (logs, test suites)
-- Keep in the main conversation: implementation, iterative work, decisions requiring context
-- Agents don't share context with each other — route information through the main conversation
+- The main conversation acts as COORDINATOR — it plans, decides, synthesizes, integrates, and handles Ori-facing judgment
+- Spawned agents are bounded WORKERS — they should advance parallel sidecar tasks, not replace coordinator responsibility
+- Prefer `explorer` for read-only research: broad codebase search, dependency tracing, long-file analysis, git history, and similar context gathering
+- Prefer `worker` for bounded execution: isolated implementation slices, test runs, lint/typecheck, log analysis, and other verbose verification
+- Use `default` only when neither `explorer` nor `worker` is a clean fit
+- Delegate only sidecar tasks that do not block the immediate next local step; keep urgent critical-path work in the main conversation
+- Keep in the main conversation: architecture decisions, plan approval, conflict resolution, iterative integration, and anything requiring Ori's input or approval
+- Agent prompts MUST be self-contained and include: goal, scope, constraints, exact files or ownership, expected output, and acceptance checks
+- Agents do not share context with each other — route information through the main conversation and explicitly pass along any needed results
+- When delegating code changes, assign disjoint ownership and tell workers they are not alone in the codebase so they avoid reverting unrelated edits
+- Parallelize independent tasks aggressively, but NEVER duplicate the same unresolved work across multiple agents
+- NEVER wait immediately by reflex after spawning agents; continue non-overlapping local work and wait only when the next step is blocked on the result
 
 ## Planning and Task handling
 
