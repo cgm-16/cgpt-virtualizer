@@ -233,17 +233,17 @@
 
 ## 11. Near-bottom follow behavior
 
-- [ ] Add near-bottom helper using 200 px threshold
+- [x] Add near-bottom helper using 200 px threshold
 - [ ] On append commit:
-  - [ ] if near bottom => mount batch and snap to exact bottom
-  - [ ] else => keep appended bubbles detached under bottom spacer
-- [ ] Add tests for near-bottom detection
-- [ ] Add integration tests for both append outcomes
+  - [x] if near bottom => mount batch and snap to exact bottom
+  - [x] else => keep appended bubbles detached under bottom spacer
+- [x] Add tests for near-bottom detection
+- [x] Add integration tests for both append outcomes
 
 ### Acceptance criteria
-- [ ] Near-bottom appends follow the bottom
-- [ ] Non-near-bottom appends remain detached
-- [ ] Bottom spacer reflects detached appended content correctly
+- [x] Near-bottom appends follow the bottom
+- [x] Non-near-bottom appends remain detached
+- [x] Bottom spacer reflects detached appended content correctly
 
 ---
 
