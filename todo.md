@@ -209,17 +209,17 @@
 ## 10. Append-only mutation handling
 
 - [x] Add `MutationObserver` on transcript root with `childList` only
-- [ ] Validate clean append-only tail updates:
+- [x] Validate clean append-only tail updates:
   - [x] appended matched bubbles at transcript tail
   - [x] no removals
   - [x] no earlier structural edits
 - [x] Add pending append node tracking
 - [x] Add 150 ms quiet-period batching
-- [ ] On valid commit:
+- [x] On valid commit:
   - [x] append BubbleRecords
   - [x] measure new nodes
   - [x] extend prefix sums
-- [ ] On invalid append pattern:
+- [x] On invalid append pattern:
   - [x] route to dirty rebuild path
 - [x] Add unit tests for append validation
 - [x] Add integration tests for append batching
