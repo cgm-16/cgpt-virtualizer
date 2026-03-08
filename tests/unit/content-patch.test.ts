@@ -92,6 +92,7 @@ function makeSessionFixture(heights: number[]): {
   return {
     bubbles,
     sessionState: {
+      mountedRange: null,
       prefixSums: [10, 30, 60, 100].slice(0, heights.length),
       records,
       scrollContainer,

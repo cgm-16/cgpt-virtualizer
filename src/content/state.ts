@@ -6,11 +6,17 @@ export interface BubbleRecord {
   pinned: boolean
 }
 
+export interface MountedRange {
+  start: number
+  end: number
+}
+
 export interface TranscriptSessionState {
   transcriptRoot: HTMLElement
   scrollContainer: HTMLElement
   records: BubbleRecord[]
   prefixSums: number[]
+  mountedRange: MountedRange | null
 }
 
 export function buildBubbleRecords(
@@ -25,4 +31,3 @@ export function buildBubbleRecords(
     pinned: false,
   }))
 }
-

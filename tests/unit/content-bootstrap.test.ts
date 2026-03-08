@@ -177,18 +177,25 @@ describe('transcript scan integration', () => {
 
   it('creates ordered session state with measured heights for eligible transcripts', () => {
     const bubbleHeights = Array.from({ length: 50 }, (_, index) => index + 0.5)
-    const fixture = makeMeasuredDocumentFixture(bubbleHeights)
+    const fixture = makeMeasuredDocumentFixture(bubbleHeights, {
+      viewportHeight: 2_500,
+    })
 
     const result = bootstrapContentScript({
       document: fixture.document,
       pathname: '/c/example',
       reportAvailability() {},
+      requestAnimationFrame(callback) {
+        callback(0)
+        return 1
+      },
     })
 
     expect(result.availability).toBe('available')
     expect(result.sessionState).not.toBeNull()
     expect(result.sessionState?.transcriptRoot).toBe(fixture.transcriptRoot)
     expect(result.sessionState?.scrollContainer).toBe(fixture.scrollContainer)
+    expect(result.sessionState?.mountedRange).toEqual({ start: 0, end: 49 })
     expect(result.sessionState?.records).toHaveLength(50)
     expect(result.sessionState?.records[0]).toMatchObject({
       index: 0,
@@ -221,9 +228,42 @@ describe('transcript scan integration', () => {
       fixture.transcriptRoot.querySelector('[data-cgpt-bottom-spacer]'),
     )
   })
+
+  it('computes an initial mounted range from the scroll viewport instead of mounting the full transcript', () => {
+    const bubbleHeights = Array.from({ length: 50 }, () => 100)
+    const fixture = makeMeasuredDocumentFixture(bubbleHeights, {
+      viewportHeight: 200,
+    })
+
+    const result = bootstrapContentScript({
+      document: fixture.document,
+      pathname: '/c/example',
+      reportAvailability() {},
+      requestAnimationFrame(callback) {
+        callback(0)
+        return 1
+      },
+    })
+
+    expect(result.sessionState?.mountedRange).toEqual({ start: 0, end: 3 })
+    expect(result.sessionState?.records.slice(0, 4).every((record) => record.mounted)).toBe(true)
+    expect(result.sessionState?.records.slice(4).every((record) => !record.mounted)).toBe(true)
+    expect(Array.from(fixture.transcriptRoot.children)).toHaveLength(6)
+  })
 })
 
 function makeMeasuredDocumentFixture(bubbleHeights: number[]): {
+  bubbles: HTMLElement[]
+  document: Document
+  scrollContainer: HTMLElement
+  transcriptRoot: HTMLElement
+}
+function makeMeasuredDocumentFixture(
+  bubbleHeights: number[],
+  options: {
+    viewportHeight: number
+  },
+): {
   bubbles: HTMLElement[]
   document: Document
   scrollContainer: HTMLElement
@@ -233,6 +273,10 @@ function makeMeasuredDocumentFixture(bubbleHeights: number[]): {
   transcriptRoot.setAttribute('data-cgpt-transcript-root', '')
   const scrollContainer = document.createElement('main')
   scrollContainer.setAttribute('data-cgpt-scroll-container', '')
+  Object.defineProperty(scrollContainer, 'clientHeight', {
+    configurable: true,
+    value: options.viewportHeight,
+  })
   const bubbles = bubbleHeights.map((height) => {
     const bubble = document.createElement('article')
     bubble.setAttribute('data-cgpt-transcript-bubble', '')
@@ -244,7 +288,8 @@ function makeMeasuredDocumentFixture(bubbleHeights: number[]): {
   streamingIndicator.setAttribute('data-cgpt-streaming-indicator', '')
 
   const body = document.createElement('body')
-  body.append(scrollContainer, transcriptRoot, streamingIndicator)
+  scrollContainer.append(transcriptRoot)
+  body.append(scrollContainer, streamingIndicator)
 
   return {
     bubbles,

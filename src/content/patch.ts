@@ -95,6 +95,7 @@ export function patchMountedRange(
   const fragment = buildMountedFragment(state.records, start, end)
   state.transcriptRoot.insertBefore(fragment, bottomSpacer)
   updateMountedFlags(state.records, start, end)
+  state.mountedRange = { start, end }
 }
 
 function detachMountedRangeOutsideNextWindow(
