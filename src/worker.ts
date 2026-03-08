@@ -10,8 +10,18 @@ const tabStateStore = createTabStateStore()
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (isContentToWorkerMessage(message)) {
-    handleContentMessage(message, sender.tab?.id ?? null, tabStateStore)
-    return false
+    void handleContentMessage(message, sender.tab?.id ?? null, {
+      refreshTab: refreshActiveTab,
+      tabStateStore,
+    })
+      .then((response) => {
+        sendResponse(response)
+      })
+      .catch(() => {
+        sendResponse(null)
+      })
+
+    return true
   }
 
   if (!isPopupToWorkerMessage(message)) {

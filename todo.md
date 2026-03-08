@@ -336,17 +336,17 @@
 
 ## 16. Memory guard
 
-- [ ] Add detached-cache pressure heuristic
-- [ ] Define internal safety threshold
+- [x] Add detached-cache pressure heuristic
+- [x] Define internal safety threshold
 - [ ] On threshold exceeded:
-  - [ ] disable virtualization for the tab
-  - [ ] trigger restore-through-refresh behavior
-- [ ] Add tests for memory guard path
+  - [x] disable virtualization for the tab
+  - [x] trigger restore-through-refresh behavior
+- [x] Add tests for memory guard path
 
 ### Acceptance criteria
-- [ ] Memory guard can be triggered in tests
-- [ ] Trigger path disables virtualization safely
-- [ ] Restore-through-refresh path is wired
+- [x] Memory guard can be triggered in tests
+- [x] Trigger path disables virtualization safely
+- [x] Restore-through-refresh path is wired
 
 ---
 
