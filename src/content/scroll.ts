@@ -10,6 +10,7 @@ import { findRangeByScrollPosition, shouldSchedulePatch } from './range.ts'
 import type { MountedRange, TranscriptSessionState } from './state.ts'
 
 export interface SchedulePatchOptions {
+  afterPatch?: (state: TranscriptSessionState) => void
   force?: boolean
 }
 
@@ -27,6 +28,7 @@ export function initializeScrollVirtualization(
   dependencies: ScrollVirtualizationDependencies = createDefaultDependencies(),
 ): ScrollVirtualizationController {
   let patchFrameQueued = false
+  let queuedAfterPatch: ((state: TranscriptSessionState) => void) | null = null
   let queuedRange: MountedRange | null = null
 
   const schedulePatch = (options: SchedulePatchOptions = {}) => {
@@ -43,6 +45,7 @@ export function initializeScrollVirtualization(
     }
 
     queuedRange = nextRange
+    queuedAfterPatch = mergeAfterPatchCallbacks(queuedAfterPatch, options.afterPatch)
 
     if (patchFrameQueued) {
       return true
@@ -57,8 +60,11 @@ export function initializeScrollVirtualization(
       }
 
       const rangeToApply = queuedRange
+      const afterPatch = queuedAfterPatch
       queuedRange = null
+      queuedAfterPatch = null
       applyMountedRangeUpdate(state, rangeToApply)
+      afterPatch?.(state)
       dependencies.afterPatch?.(state)
     })
 
@@ -75,6 +81,24 @@ export function initializeScrollVirtualization(
   )
 
   return { schedulePatch }
+}
+
+function mergeAfterPatchCallbacks(
+  currentCallback: ((state: TranscriptSessionState) => void) | null,
+  nextCallback: ((state: TranscriptSessionState) => void) | undefined,
+): ((state: TranscriptSessionState) => void) | null {
+  if (nextCallback === undefined) {
+    return currentCallback
+  }
+
+  if (currentCallback === null) {
+    return nextCallback
+  }
+
+  return (state) => {
+    currentCallback(state)
+    nextCallback(state)
+  }
 }
 
 function createDefaultDependencies(): ScrollVirtualizationDependencies {

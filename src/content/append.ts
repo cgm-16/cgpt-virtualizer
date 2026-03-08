@@ -1,6 +1,14 @@
-import { APPEND_QUIET_PERIOD_MS } from '../shared/constants.ts'
+import {
+  APPEND_QUIET_PERIOD_MS,
+  NEAR_BOTTOM_THRESHOLD_PX,
+} from '../shared/constants.ts'
+import {
+  isNearBottom,
+  snapToBottom,
+} from './bottom-follow.ts'
 import { extendPrefixSums } from './prefix-sums.ts'
 import type { DirtyRebuildReason } from './rebuild.ts'
+import type { SchedulePatchOptions } from './scroll.ts'
 import {
   buildBubbleRecords,
   type BubbleRecord,
@@ -24,7 +32,7 @@ export interface AppendObserverManagerDependencies {
   isTranscriptBubble(node: Node): node is Element
   measure(node: Element): number
   requestDirtyRebuild(state: TranscriptSessionState, reason: DirtyRebuildReason): void
-  schedulePatch(options?: { force?: boolean }): boolean
+  schedulePatch(options?: SchedulePatchOptions): boolean
   setTimeout(callback: () => void, delay: number): number
 }
 
@@ -154,6 +162,10 @@ function commitPendingAppends(
     return
   }
 
+  const shouldFollowBottom = isNearBottom(
+    state.scrollContainer,
+    NEAR_BOTTOM_THRESHOLD_PX,
+  )
   const appendedRecords = buildAppendedRecords(
     pendingNodes,
     state.records.length,
@@ -162,7 +174,16 @@ function commitPendingAppends(
 
   state.records.push(...appendedRecords)
   state.prefixSums = extendPrefixSums(state.prefixSums, appendedRecords)
-  dependencies.schedulePatch({ force: true })
+  dependencies.schedulePatch(
+    shouldFollowBottom
+      ? {
+          afterPatch() {
+            snapToBottom(state.scrollContainer)
+          },
+          force: true,
+        }
+      : { force: true },
+  )
 }
 
 function buildAppendedRecords(
