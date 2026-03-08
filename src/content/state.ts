@@ -1,3 +1,5 @@
+import type { AnchorSnapshot } from './anchor.ts'
+
 export interface BubbleRecord {
   index: number
   node: Element
@@ -17,6 +19,8 @@ export interface TranscriptSessionState {
   records: BubbleRecord[]
   prefixSums: number[]
   mountedRange: MountedRange | null
+  anchor: AnchorSnapshot | null
+  pendingScrollCorrection: number
 }
 
 export function buildBubbleRecords(

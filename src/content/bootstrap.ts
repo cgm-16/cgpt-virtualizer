@@ -73,7 +73,9 @@ function createTranscriptSessionState(
   const records = buildBubbleRecords(scanResult.bubbles, measureBubble)
 
   return {
+    anchor: null,
     transcriptRoot: scanResult.transcriptRoot,
+    pendingScrollCorrection: 0,
     scrollContainer,
     records,
     prefixSums: buildPrefixSums(records),
