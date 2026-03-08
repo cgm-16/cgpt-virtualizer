@@ -16,6 +16,11 @@ import {
   runDirtyRebuild,
 } from './rebuild.ts'
 import {
+  createSelectorFailureObserverManager,
+  handleSelectorStartupFailure,
+  reportUnavailableStatus,
+} from './failure.ts'
+import {
   createResizeObserverManager,
   type ResizeObserverLike,
 } from './resize.ts'
@@ -59,8 +64,18 @@ export function bootstrapContentScript(
   const selectors = isSupportedTranscriptPath(dependencies.pathname)
     ? resolveSelectors(dependencies.document)
     : null
-  const scanResult = selectors !== null ? scanTranscript(selectors) : null
   const baseAvailability = resolveAvailability(dependencies.pathname, selectors)
+
+  if (baseAvailability === 'unavailable') {
+    return {
+      availability: handleSelectorStartupFailure(dependencies.reportAvailability),
+      destroy() {},
+      scanResult: null,
+      sessionState: null,
+    }
+  }
+
+  const scanResult = selectors !== null ? scanTranscript(selectors) : null
   const availability =
     baseAvailability === 'available' && scanResult !== null && !scanResult.activationEligible
       ? 'inactive'
@@ -76,11 +91,15 @@ export function bootstrapContentScript(
     const activeSessionState = sessionState
     let appendObserverManager: ReturnType<typeof createAppendObserverManager> | null = null
     let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
+    let selectorFailureObserverManager:
+      | ReturnType<typeof createSelectorFailureObserverManager>
+      | null = null
     let structuralRebuildObserverManager:
       | ReturnType<typeof createStructuralRebuildObserverManager>
       | null = null
     let streamingObserverManager: ReturnType<typeof createStreamingObserverManager> | null = null
     let dirtyRebuildInProgress = false
+    let sessionClosed = false
 
     activeSessionState.isStreaming = detectStreamingState(
       dependencies.document,
@@ -105,15 +124,39 @@ export function bootstrapContentScript(
       appendObserverManager = null
       resizeObserverManager?.disconnect()
       resizeObserverManager = null
+      selectorFailureObserverManager?.disconnect()
+      selectorFailureObserverManager = null
       structuralRebuildObserverManager?.disconnect()
       structuralRebuildObserverManager = null
       streamingObserverManager?.disconnect()
       streamingObserverManager = null
     }
-    destroy = () => {
+
+    const teardownSession = () => {
+      if (sessionClosed) {
+        return false
+      }
+
+      sessionClosed = true
       disconnectObservers()
       scrollController.disconnect()
       destroyTranscriptSession(activeSessionState)
+
+      return true
+    }
+
+    const handleMidSessionSelectorFailure = () => {
+      if (!teardownSession()) {
+        return false
+      }
+
+      reportUnavailableStatus(dependencies.reportAvailability)
+
+      return true
+    }
+
+    destroy = () => {
+      teardownSession()
     }
 
     const runPendingDirtyRebuild = () => {
@@ -128,6 +171,9 @@ export function bootstrapContentScript(
           detectStreamingState,
           disconnectObservers,
           document: dependencies.document,
+          handleSelectorFailure() {
+            handleMidSessionSelectorFailure()
+          },
           measure: measureBubble,
           reconnectObservers: connectObservers,
           resolveSelectors,
@@ -184,6 +230,15 @@ export function bootstrapContentScript(
           dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
         requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
       })
+      selectorFailureObserverManager = createSelectorFailureObserverManager({
+        createMutationObserver:
+          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+        document: dependencies.document,
+        handleSelectorFailure() {
+          handleMidSessionSelectorFailure()
+        },
+        resolveSelectors,
+      })
       streamingObserverManager = createStreamingObserverManager({
         createMutationObserver:
           dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
@@ -208,6 +263,7 @@ export function bootstrapContentScript(
         streamingIndicatorSelector: activeSelectors.streamingIndicatorSelector,
       })
       resizeObserverManager.refreshObservedRecords()
+      selectorFailureObserverManager.sync()
       streamingObserverManager.sync()
     }
 

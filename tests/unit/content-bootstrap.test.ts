@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { bootstrapContentScript } from '../../src/content/bootstrap.ts'
 import { resolveAvailability } from '../../src/content/availability.ts'
@@ -261,6 +261,77 @@ describe('transcript scan integration', () => {
     expect(result.sessionState?.records.slice(4).every((record) => !record.mounted)).toBe(true)
     expect(Array.from(fixture.transcriptRoot.children)).toHaveLength(6)
   })
+
+  it('reports unavailable and becomes inert when selectors disappear mid-session', () => {
+    const reports: unknown[] = []
+    const mutationObservers: MockMutationObserverEntry[] = []
+    const requestAnimationFrame = vi.fn(() => 1)
+    const fixture = makeLiveMeasuredDocumentFixture(Array.from({ length: 50 }, () => 100), {
+      viewportHeight: 200,
+    })
+
+    const result = bootstrapContentScript({
+      createMutationObserver: createMockMutationObserverFactory(mutationObservers),
+      createResizeObserver: createNoopResizeObserver,
+      document,
+      pathname: '/c/example',
+      reportAvailability(message) {
+        reports.push(message)
+      },
+      requestAnimationFrame,
+    })
+
+    const selectorFailureObserver = mutationObservers.find((entry) =>
+      entry.observe.mock.calls.some(
+        ([target, options]) =>
+          target === document.body &&
+          typeof options === 'object' &&
+          options !== null &&
+          'childList' in options &&
+          options.childList === true &&
+          'subtree' in options &&
+          options.subtree === true,
+      ),
+    )
+
+    expect(result.availability).toBe('available')
+    expect(selectorFailureObserver).toBeDefined()
+    expect(result.sessionState).not.toBeNull()
+    expect(reports).toEqual([
+      {
+        availability: 'available',
+        type: 'runtime/report-content-availability',
+      },
+    ])
+
+    document.body.innerHTML = '<main data-cgpt-scroll-container></main>'
+    selectorFailureObserver?.callback(
+      [
+        makeChildListMutationRecord(
+          document.body,
+          Array.from(document.body.childNodes),
+          [fixture.scrollContainer, fixture.streamingIndicator],
+        ),
+      ],
+      {} as MutationObserver,
+    )
+
+    expect(reports).toEqual([
+      {
+        availability: 'available',
+        type: 'runtime/report-content-availability',
+      },
+      {
+        availability: 'unavailable',
+        type: 'runtime/report-content-availability',
+      },
+    ])
+    expect(result.sessionState?.records).toHaveLength(0)
+
+    const rafCallCount = requestAnimationFrame.mock.calls.length
+    fixture.scrollContainer.dispatchEvent(new Event('scroll'))
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(rafCallCount)
+  })
 })
 
 function makeMeasuredDocumentFixture(bubbleHeights: number[]): {
@@ -313,4 +384,97 @@ function makeMeasuredDocumentFixture(
     scrollContainer,
     transcriptRoot,
   }
+}
+
+function makeLiveMeasuredDocumentFixture(
+  bubbleHeights: number[],
+  options: {
+    viewportHeight: number
+  },
+): {
+  bubbles: HTMLElement[]
+  scrollContainer: HTMLElement
+  streamingIndicator: HTMLElement
+  transcriptRoot: HTMLElement
+} {
+  document.body.innerHTML = ''
+
+  const transcriptRoot = document.createElement('section')
+  transcriptRoot.setAttribute('data-cgpt-transcript-root', '')
+  const scrollContainer = document.createElement('main')
+  scrollContainer.setAttribute('data-cgpt-scroll-container', '')
+  Object.defineProperty(scrollContainer, 'clientHeight', {
+    configurable: true,
+    value: options.viewportHeight,
+  })
+  const bubbles = bubbleHeights.map((height) => {
+    const bubble = document.createElement('article')
+    bubble.setAttribute('data-cgpt-transcript-bubble', '')
+    bubble.getBoundingClientRect = () => ({ height }) as DOMRect
+    transcriptRoot.append(bubble)
+    return bubble
+  })
+  const streamingIndicator = document.createElement('div')
+  streamingIndicator.setAttribute('data-cgpt-streaming-indicator', '')
+  streamingIndicator.setAttribute('hidden', '')
+
+  scrollContainer.append(transcriptRoot)
+  document.body.append(scrollContainer, streamingIndicator)
+
+  return {
+    bubbles,
+    scrollContainer,
+    streamingIndicator,
+    transcriptRoot,
+  }
+}
+
+interface MockMutationObserverEntry {
+  callback: MutationCallback
+  disconnect: ReturnType<typeof vi.fn>
+  observe: ReturnType<typeof vi.fn>
+  takeRecords: ReturnType<typeof vi.fn>
+}
+
+function createMockMutationObserverFactory(
+  entries: MockMutationObserverEntry[],
+): (callback: MutationCallback) => {
+  disconnect(): void
+  observe(target: Node, options?: MutationObserverInit): void
+  takeRecords(): MutationRecord[]
+} {
+  return (callback) => {
+    const entry: MockMutationObserverEntry = {
+      callback,
+      disconnect: vi.fn(),
+      observe: vi.fn(),
+      takeRecords: vi.fn(() => []),
+    }
+
+    entries.push(entry)
+
+    return {
+      disconnect: entry.disconnect,
+      observe: entry.observe,
+      takeRecords: entry.takeRecords,
+    }
+  }
+}
+
+function makeChildListMutationRecord(
+  target: Node,
+  addedNodes: Node[],
+  removedNodes: Node[] = [],
+): MutationRecord {
+  return {
+    addedNodes: addedNodes as unknown as NodeList,
+    attributeName: null,
+    attributeNamespace: null,
+    nextSibling: null,
+    oldValue: null,
+    previousSibling: null,
+    removedNodes: removedNodes as unknown as NodeList,
+    target,
+    type: 'childList',
+  } as MutationRecord
 }

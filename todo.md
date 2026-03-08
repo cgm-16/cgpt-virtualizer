@@ -321,16 +321,16 @@
 
 ## 15. Failure handling and unavailable mode
 
-- [ ] Implement startup selector failure => `Unavailable`
-- [ ] Implement mid-session selector failure => stop virtualization + go inert
-- [ ] Keep content script inert until refresh or navigation after selector failure
-- [ ] Wire `Unavailable` status into popup
-- [ ] Add regression tests for unavailable behavior
+- [x] Implement startup selector failure => `Unavailable`
+- [x] Implement mid-session selector failure => stop virtualization + go inert
+- [x] Keep content script inert until refresh or navigation after selector failure
+- [x] Wire `Unavailable` status into popup
+- [x] Add regression tests for unavailable behavior
 
 ### Acceptance criteria
-- [ ] Selector failure is surfaced clearly
-- [ ] Virtualization stops safely on mid-session failure
-- [ ] Popup reflects `Unavailable`
+- [x] Selector failure is surfaced clearly
+- [x] Virtualization stops safely on mid-session failure
+- [x] Popup reflects `Unavailable`
 
 ---
 
