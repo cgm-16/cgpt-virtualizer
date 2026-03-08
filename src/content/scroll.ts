@@ -4,6 +4,11 @@ import {
   resolveAnchorCorrection,
   type ViewportRect,
 } from './anchor.ts'
+import {
+  clearStreamingPlaceholder,
+  renderStreamingPlaceholder,
+  resolveStreamingGapEdge,
+} from './placeholder.ts'
 import { OVERSCAN_VIEWPORT_COUNT } from '../shared/constants.ts'
 import { patchMountedRange } from './patch.ts'
 import { findRangeByScrollPosition, shouldSchedulePatch } from './range.ts'
@@ -63,6 +68,21 @@ export function initializeScrollVirtualization(
       const afterPatch = queuedAfterPatch
       queuedRange = null
       queuedAfterPatch = null
+
+       if (state.isStreaming) {
+        applyPendingAnchorCorrection(state)
+        const placeholderEdge = resolveStreamingGapEdge(state.mountedRange, rangeToApply)
+
+        if (placeholderEdge === null) {
+          clearStreamingPlaceholder(state)
+        } else {
+          renderStreamingPlaceholder(state, placeholderEdge)
+        }
+
+        return
+      }
+
+      clearStreamingPlaceholder(state)
       applyMountedRangeUpdate(state, rangeToApply)
       afterPatch?.(state)
       dependencies.afterPatch?.(state)

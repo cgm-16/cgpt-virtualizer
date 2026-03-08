@@ -94,6 +94,7 @@ function makeSessionFixture(heights: number[]): {
     sessionState: {
       anchor: null,
       dirtyRebuildReason: null,
+      isStreaming: false,
       mountedRange: null,
       pendingScrollCorrection: 0,
       prefixSums: [10, 30, 60, 100].slice(0, heights.length),

@@ -297,6 +297,7 @@ function makeMeasuredDocumentFixture(
   })
   const streamingIndicator = document.createElement('div')
   streamingIndicator.setAttribute('data-cgpt-streaming-indicator', '')
+  streamingIndicator.setAttribute('hidden', '')
 
   const body = document.createElement('body')
   scrollContainer.append(transcriptRoot)

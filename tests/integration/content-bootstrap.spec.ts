@@ -204,6 +204,194 @@ test('range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다
   expect(await page.evaluate(() => (window as WindowWithTestState).__rafCallCount)).toBe(2)
 })
 
+test('streaming 중 scroll은 mounted range 패치를 멈춘다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (scrollContainer === null || streamingIndicator === null) {
+      throw new Error('streaming fixture is missing')
+    }
+
+    streamingIndicator.removeAttribute('hidden')
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+        }
+      }),
+    )
+    .toEqual({
+      firstBubbleText: 'Bubble 0',
+      lastBubbleText: 'Bubble 3',
+    })
+})
+
+test('streaming gap에 진입하면 placeholder를 표시하고 종료 시 제거한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (scrollContainer === null || streamingIndicator === null) {
+      throw new Error('streaming fixture is missing')
+    }
+
+    streamingIndicator.removeAttribute('hidden')
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+
+        return {
+          lastBubbleText:
+            transcriptRoot === null
+              ? null
+              : Array.from(transcriptRoot.children).at(-2)?.textContent ?? null,
+          placeholderEdge:
+            transcriptRoot?.querySelector('[data-cgpt-streaming-gap-placeholder]')?.getAttribute(
+              'data-cgpt-streaming-gap-edge',
+            ) ?? null,
+        }
+      }),
+    )
+    .toEqual({
+      lastBubbleText: 'Bubble 3',
+      placeholderEdge: 'bottom',
+    })
+
+  await page.evaluate(() => {
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (streamingIndicator === null) {
+      throw new Error('streaming indicator fixture is missing')
+    }
+
+    streamingIndicator.setAttribute('hidden', '')
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+        const children = transcriptRoot === null ? [] : Array.from(transcriptRoot.children)
+
+        return {
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          placeholderCount:
+            transcriptRoot?.querySelectorAll('[data-cgpt-streaming-gap-placeholder]').length ?? 0,
+        }
+      }),
+    )
+    .toEqual({
+      lastBubbleText: 'Bubble 6',
+      placeholderCount: 0,
+    })
+})
+
+test('streaming 중 resize는 anchor correction을 계속 적용한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (scrollContainer === null || streamingIndicator === null) {
+      throw new Error('streaming fixture is missing')
+    }
+
+    streamingIndicator.removeAttribute('hidden')
+    scrollContainer.scrollTop = 250
+    scrollContainer.dispatchEvent(new Event('scroll'))
+
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+  })
+
+  const beforeResize = await page.evaluate(() => {
+    const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+    const anchorBubble = (window as WindowWithTestState).__allBubbles[2]
+    const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+
+    if (scrollContainer === null || anchorBubble === undefined || transcriptRoot === null) {
+      throw new Error('streaming resize fixture is missing')
+    }
+
+    return {
+      anchorOffset:
+        anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+      lastBubbleText: Array.from(transcriptRoot.children).at(-2)?.textContent ?? null,
+      scrollTop: scrollContainer.scrollTop,
+    }
+  })
+
+  expect(beforeResize).toEqual({
+    anchorOffset: -50,
+    lastBubbleText: 'Bubble 3',
+    scrollTop: 250,
+  })
+
+  await page.evaluate(() => {
+    ;(window as WindowWithTestState).__allBubbles[0]?.setAttribute(
+      'style',
+      'display: block; height: 125px;',
+    )
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const scrollContainer = document.querySelector<HTMLElement>('[data-cgpt-scroll-container]')
+        const anchorBubble = (window as WindowWithTestState).__allBubbles[2]
+        const transcriptRoot = document.querySelector('[data-cgpt-transcript-root]')
+
+        if (scrollContainer === null || anchorBubble === undefined || transcriptRoot === null) {
+          throw new Error('streaming resize fixture is missing')
+        }
+
+        return {
+          anchorOffset:
+            anchorBubble.getBoundingClientRect().top - scrollContainer.getBoundingClientRect().top,
+          lastBubbleText: Array.from(transcriptRoot.children).at(-2)?.textContent ?? null,
+          scrollTop: scrollContainer.scrollTop,
+        }
+      }),
+    )
+    .toEqual({
+      anchorOffset: -50,
+      lastBubbleText: 'Bubble 3',
+      scrollTop: 275,
+    })
+})
+
 test('mounted bubble resize는 prefix sum과 mounted range를 갱신한다', async ({ page }) => {
   await installFixtureRoutes(page)
   await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
@@ -382,6 +570,79 @@ test('anchor 위 bubble resize는 읽기 위치를 유지한다', async ({ page 
       anchorOffset: -50,
       rafCallCount: 2,
       scrollTop: 275,
+    })
+})
+
+test('streaming 종료 시 pending append batch를 즉시 flush한다', async ({ page }) => {
+  await installFixtureRoutes(page)
+  await page.goto('http://fixture.test/c/bubble-50?fixture=bubble-50')
+
+  await expectInitialMountedWindow(page)
+
+  await page.evaluate(async () => {
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+    const transcriptRoot = document.querySelector<HTMLElement>('[data-cgpt-transcript-root]')
+
+    if (streamingIndicator === null || transcriptRoot === null) {
+      throw new Error('streaming append fixture is missing')
+    }
+
+    streamingIndicator.removeAttribute('hidden')
+
+    const first = document.createElement('article')
+    first.setAttribute('data-cgpt-transcript-bubble', '')
+    first.setAttribute('style', 'display: block; height: 100px;')
+    first.textContent = 'Bubble 50'
+
+    const second = document.createElement('article')
+    second.setAttribute('data-cgpt-transcript-bubble', '')
+    second.setAttribute('style', 'display: block; height: 100px;')
+    second.textContent = 'Bubble 51'
+
+    ;(window as WindowWithTestState).__tailAppendNodes = [first, second]
+
+    transcriptRoot.append(first)
+    await new Promise((resolve) => window.setTimeout(resolve, 50))
+    transcriptRoot.append(second)
+    await new Promise((resolve) => window.setTimeout(resolve, 200))
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => ({
+        detachedTailBubbleCount:
+          (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
+        transcriptChildCount:
+          document.querySelector('[data-cgpt-transcript-root]')?.children.length ?? 0,
+      })),
+    )
+    .toEqual({
+      detachedTailBubbleCount: 0,
+      transcriptChildCount: 8,
+    })
+
+  await page.evaluate(() => {
+    const streamingIndicator = document.querySelector<HTMLElement>('[data-cgpt-streaming-indicator]')
+
+    if (streamingIndicator === null) {
+      throw new Error('streaming indicator fixture is missing')
+    }
+
+    streamingIndicator.setAttribute('hidden', '')
+  })
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => ({
+        detachedTailBubbleCount:
+          (window as WindowWithTestState).__tailAppendNodes.filter((node) => !node.isConnected).length,
+        transcriptChildCount:
+          document.querySelector('[data-cgpt-transcript-root]')?.children.length ?? 0,
+      })),
+    )
+    .toEqual({
+      detachedTailBubbleCount: 2,
+      transcriptChildCount: 6,
     })
 })
 

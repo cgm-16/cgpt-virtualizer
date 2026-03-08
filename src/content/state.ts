@@ -20,6 +20,7 @@ export interface TranscriptSessionState {
   records: BubbleRecord[]
   prefixSums: number[]
   mountedRange: MountedRange | null
+  isStreaming: boolean
   anchor: AnchorSnapshot | null
   dirtyRebuildReason: DirtyRebuildReason | null
   pendingScrollCorrection: number
