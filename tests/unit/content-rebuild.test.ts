@@ -108,6 +108,37 @@ describe('runDirtyRebuild', () => {
       'Bubble 5',
     ])
   })
+
+  it('enters selector failure handling when selectors can no longer be resolved', () => {
+    const fixture = makeDirtyRebuildFixture()
+    const disconnectObservers = vi.fn()
+    const reconnectObservers = vi.fn()
+    const handleSelectorFailure = vi.fn()
+    const schedulePatch = vi.fn(() => true)
+
+    const didRebuild = runDirtyRebuild(fixture.sessionState, 'append-removal', {
+      detectStreamingState() {
+        return false
+      },
+      disconnectObservers,
+      document,
+      handleSelectorFailure,
+      measure(node) {
+        return fixture.measuredHeights.get(node) ?? 0
+      },
+      reconnectObservers,
+      resolveSelectors() {
+        return null
+      },
+      schedulePatch,
+    })
+
+    expect(didRebuild).toBe(false)
+    expect(disconnectObservers).toHaveBeenCalledTimes(1)
+    expect(handleSelectorFailure).toHaveBeenCalledTimes(1)
+    expect(reconnectObservers).not.toHaveBeenCalled()
+    expect(schedulePatch).not.toHaveBeenCalled()
+  })
 })
 
 describe('createStructuralRebuildObserverManager', () => {

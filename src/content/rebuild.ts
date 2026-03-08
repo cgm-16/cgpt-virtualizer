@@ -30,6 +30,7 @@ export interface RunDirtyRebuildDependencies {
   detectStreamingState(document: Document, streamingIndicatorSelector: string): boolean
   disconnectObservers(): void
   document: Document
+  handleSelectorFailure(): void
   measure(node: Element): number
   reconnectObservers(): void
   resolveSelectors(document: Document): ResolvedContentSelectors | null
@@ -86,7 +87,7 @@ export function runDirtyRebuild(
   const selectors = dependencies.resolveSelectors(dependencies.document)
 
   if (selectors === null) {
-    dependencies.reconnectObservers()
+    dependencies.handleSelectorFailure()
     return false
   }
 
