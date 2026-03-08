@@ -49,7 +49,7 @@ export function createPopupState(
     }
   }
 
-  if (!enabled || availability === 'idle') {
+  if (!enabled || availability === 'idle' || availability === 'inactive') {
     return {
       enabled,
       status: 'Off',

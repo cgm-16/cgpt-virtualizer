@@ -3,6 +3,7 @@ import type { ContentAvailability } from '../shared/types.ts'
 import { isSupportedTranscriptPath } from '../shared/routes.ts'
 import { resolveAvailability } from './availability.ts'
 import { resolveSelectors } from './selectors.ts'
+import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
 
 export interface ContentBootstrapDependencies {
   document: Document
@@ -10,17 +11,27 @@ export interface ContentBootstrapDependencies {
   reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
 }
 
+export interface ContentBootstrapResult {
+  availability: ContentAvailability
+  scanResult: TranscriptScanResult | null
+}
+
 export function bootstrapContentScript(
   dependencies: ContentBootstrapDependencies = createDefaultDependencies(),
-): ContentAvailability {
+): ContentBootstrapResult {
   const selectors = isSupportedTranscriptPath(dependencies.pathname)
     ? resolveSelectors(dependencies.document)
     : null
-  const availability = resolveAvailability(dependencies.pathname, selectors)
+  const scanResult = selectors !== null ? scanTranscript(selectors) : null
+  const baseAvailability = resolveAvailability(dependencies.pathname, selectors)
+  const availability =
+    baseAvailability === 'available' && scanResult !== null && !scanResult.activationEligible
+      ? 'inactive'
+      : baseAvailability
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
 
-  return availability
+  return { availability, scanResult }
 }
 
 function createDefaultDependencies(): ContentBootstrapDependencies {

@@ -82,6 +82,12 @@ describe('popup-worker message contracts', () => {
     ).toBe(true)
     expect(
       isContentToWorkerMessage({
+        availability: 'inactive',
+        type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
+      }),
+    ).toBe(true)
+    expect(
+      isContentToWorkerMessage({
         availability: 'unavailable',
         type: REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE,
       }),
@@ -138,6 +144,13 @@ describe('tab state store', () => {
 
   it('maps idle availability to off even when the tab preference is on', () => {
     expect(createPopupState(7, true, 'idle')).toEqual({
+      enabled: true,
+      status: 'Off',
+    })
+  })
+
+  it('maps below-threshold transcripts to off even when the tab preference is on', () => {
+    expect(createPopupState(7, true, 'inactive')).toEqual({
       enabled: true,
       status: 'Off',
     })
