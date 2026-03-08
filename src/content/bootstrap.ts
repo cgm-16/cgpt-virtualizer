@@ -9,7 +9,11 @@ import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
 import { clearStreamingPlaceholder } from './placeholder.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
-import { requestDirtyRebuild } from './rebuild.ts'
+import {
+  createStructuralRebuildObserverManager,
+  requestDirtyRebuild,
+  runDirtyRebuild,
+} from './rebuild.ts'
 import {
   createResizeObserverManager,
   type ResizeObserverLike,
@@ -21,6 +25,7 @@ import {
 import { resolveSelectors } from './selectors.ts'
 import {
   buildBubbleRecords,
+  markAllRecordsMounted,
   type TranscriptSessionState,
 } from './state.ts'
 import {
@@ -64,70 +69,141 @@ export function bootstrapContentScript(
       : null
 
   if (sessionState !== null && selectors !== null) {
+    const activeSelectors = selectors
+    const activeSessionState = sessionState
     let appendObserverManager: ReturnType<typeof createAppendObserverManager> | null = null
     let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
+    let structuralRebuildObserverManager:
+      | ReturnType<typeof createStructuralRebuildObserverManager>
+      | null = null
     let streamingObserverManager: ReturnType<typeof createStreamingObserverManager> | null = null
+    let dirtyRebuildInProgress = false
 
-    sessionState.isStreaming = detectStreamingState(
+    activeSessionState.isStreaming = detectStreamingState(
       dependencies.document,
-      selectors.streamingIndicatorSelector,
+      activeSelectors.streamingIndicatorSelector,
     )
 
-    if (sessionState.isStreaming) {
-      markAllRecordsMounted(sessionState)
+    if (activeSessionState.isStreaming) {
+      markAllRecordsMounted(activeSessionState)
     }
 
-    const scrollController = initializeScrollVirtualization(sessionState, {
+    const scrollController = initializeScrollVirtualization(activeSessionState, {
       afterPatch() {
         appendObserverManager?.flushPendingMutationRecords()
+        structuralRebuildObserverManager?.flushPendingMutationRecords()
         resizeObserverManager?.refreshObservedRecords()
       },
       requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
     })
-    resizeObserverManager = createResizeObserverManager(sessionState, {
-      applyPendingCorrection() {
-        applyPendingAnchorCorrection(sessionState)
-      },
-      createResizeObserver:
-        dependencies.createResizeObserver ?? ((callback) => new ResizeObserver(callback)),
-      measure: measureBubble,
-      schedulePatch() {
-        return scrollController.schedulePatch()
-      },
-    })
-    appendObserverManager = createAppendObserverManager(sessionState, {
-      clearTimeout: dependencies.clearTimeout ?? window.clearTimeout.bind(window),
-      createMutationObserver:
-        dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
-      isTranscriptBubble(node): node is Element {
-        return node instanceof Element && node.matches(selectors.bubbleSelector)
-      },
-      measure: measureBubble,
-      requestDirtyRebuild,
-      schedulePatch(options) {
-        return scrollController.schedulePatch(options)
-      },
-      setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
-    })
-    streamingObserverManager = createStreamingObserverManager({
-      createMutationObserver:
-        dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
-      document: dependencies.document,
-      onStreamingChange(nextIsStreaming) {
-        sessionState.isStreaming = nextIsStreaming
 
-        if (nextIsStreaming) {
-          return
-        }
+    const disconnectObservers = () => {
+      appendObserverManager?.disconnect()
+      appendObserverManager = null
+      resizeObserverManager?.disconnect()
+      resizeObserverManager = null
+      structuralRebuildObserverManager?.disconnect()
+      structuralRebuildObserverManager = null
+      streamingObserverManager?.disconnect()
+      streamingObserverManager = null
+    }
 
-        clearStreamingPlaceholder(sessionState)
-        appendObserverManager?.flushPendingAppends()
-        scrollController.schedulePatch({ force: true })
-      },
-      streamingIndicatorSelector: selectors.streamingIndicatorSelector,
-    })
-    resizeObserverManager.refreshObservedRecords()
-    streamingObserverManager.sync()
+    const runPendingDirtyRebuild = () => {
+      if (activeSessionState.dirtyRebuildReason === null || dirtyRebuildInProgress) {
+        return false
+      }
+
+      dirtyRebuildInProgress = true
+
+      try {
+        return runDirtyRebuild(activeSessionState, activeSessionState.dirtyRebuildReason, {
+          detectStreamingState,
+          disconnectObservers,
+          document: dependencies.document,
+          measure: measureBubble,
+          reconnectObservers: connectObservers,
+          resolveSelectors,
+          schedulePatch(options) {
+            return scrollController.schedulePatch(options)
+          },
+        })
+      } finally {
+        dirtyRebuildInProgress = false
+      }
+    }
+
+    const requestDirtyRebuildAndMaybeRun = (
+      state: TranscriptSessionState,
+      reason: Parameters<typeof requestDirtyRebuild>[1],
+    ) => {
+      requestDirtyRebuild(state, reason)
+
+      if (state.isStreaming) {
+        return
+      }
+
+      runPendingDirtyRebuild()
+    }
+
+    function connectObservers(): void {
+      resizeObserverManager = createResizeObserverManager(activeSessionState, {
+        applyPendingCorrection() {
+          applyPendingAnchorCorrection(activeSessionState)
+        },
+        createResizeObserver:
+          dependencies.createResizeObserver ?? ((callback) => new ResizeObserver(callback)),
+        measure: measureBubble,
+        schedulePatch() {
+          return scrollController.schedulePatch()
+        },
+      })
+      appendObserverManager = createAppendObserverManager(activeSessionState, {
+        clearTimeout: dependencies.clearTimeout ?? window.clearTimeout.bind(window),
+        createMutationObserver:
+          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+        isTranscriptBubble(node): node is Element {
+          return node instanceof Element && node.matches(activeSelectors.bubbleSelector)
+        },
+        measure: measureBubble,
+        requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
+        schedulePatch(options) {
+          return scrollController.schedulePatch(options)
+        },
+        setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
+      })
+      structuralRebuildObserverManager = createStructuralRebuildObserverManager(activeSessionState, {
+        createMutationObserver:
+          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+        requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
+      })
+      streamingObserverManager = createStreamingObserverManager({
+        createMutationObserver:
+          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+        document: dependencies.document,
+        onStreamingChange(nextIsStreaming) {
+          activeSessionState.isStreaming = nextIsStreaming
+
+          if (nextIsStreaming) {
+            return
+          }
+
+          clearStreamingPlaceholder(activeSessionState)
+
+          if (activeSessionState.dirtyRebuildReason !== null) {
+            runPendingDirtyRebuild()
+            return
+          }
+
+          appendObserverManager?.flushPendingAppends()
+          scrollController.schedulePatch({ force: true })
+        },
+        streamingIndicatorSelector: activeSelectors.streamingIndicatorSelector,
+      })
+      resizeObserverManager.refreshObservedRecords()
+      streamingObserverManager.sync()
+    }
+
+    connectObservers()
   }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
@@ -165,15 +241,4 @@ function createTranscriptSessionState(
     prefixSums: buildPrefixSums(records),
     mountedRange: null,
   }
-}
-
-function markAllRecordsMounted(state: TranscriptSessionState): void {
-  for (const record of state.records) {
-    record.mounted = true
-  }
-
-  state.mountedRange =
-    state.records.length === 0
-      ? null
-      : { start: 0, end: state.records.length - 1 }
 }

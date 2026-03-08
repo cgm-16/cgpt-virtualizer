@@ -38,3 +38,14 @@ export function buildBubbleRecords(
     pinned: false,
   }))
 }
+
+export function markAllRecordsMounted(state: TranscriptSessionState): void {
+  for (const record of state.records) {
+    record.mounted = true
+  }
+
+  state.mountedRange =
+    state.records.length === 0
+      ? null
+      : { start: 0, end: state.records.length - 1 }
+}

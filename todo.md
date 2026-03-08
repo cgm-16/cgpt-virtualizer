@@ -271,29 +271,29 @@
 
 ## 13. Dirty rebuild coordinator
 
-- [ ] Implement full rebuild coordinator
-- [ ] Trigger rebuild for:
-  - [ ] mid-thread edits
-  - [ ] rewrite/regenerate flows
-  - [ ] invalid append validation
-  - [ ] unsafe structural transcript changes
-- [ ] Rebuild flow must:
-  - [ ] capture anchor if possible
-  - [ ] disconnect observers
-  - [ ] discard detached cache
-  - [ ] discard BubbleRecords and measurements
-  - [ ] rescan live transcript DOM
-  - [ ] remeasure all bubbles
-  - [ ] rebuild prefix sums
-  - [ ] restore scroll via surviving anchor node when possible
-  - [ ] otherwise fall back to raw `scrollTop`
-  - [ ] recreate observers
-- [ ] Add integration tests for rebuild scenarios
+- [x] Implement full rebuild coordinator
+- [x] Trigger rebuild for:
+  - [x] mid-thread edits
+  - [x] rewrite/regenerate flows
+  - [x] invalid append validation
+  - [x] unsafe structural transcript changes
+- [x] Rebuild flow must:
+  - [x] capture anchor if possible
+  - [x] disconnect observers
+  - [x] discard detached cache
+  - [x] discard BubbleRecords and measurements
+  - [x] rescan live transcript DOM
+  - [x] remeasure all bubbles
+  - [x] rebuild prefix sums
+  - [x] restore scroll via surviving anchor node when possible
+  - [x] otherwise fall back to raw `scrollTop`
+  - [x] recreate observers
+- [x] Add integration tests for rebuild scenarios
 
 ### Acceptance criteria
-- [ ] Dirty rebuild restores a valid transcript session
-- [ ] Surviving anchor restores position when possible
-- [ ] Fallback to raw `scrollTop` works safely
+- [x] Dirty rebuild restores a valid transcript session
+- [x] Surviving anchor restores position when possible
+- [x] Fallback to raw `scrollTop` works safely
 
 ---
 
