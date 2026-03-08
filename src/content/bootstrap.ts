@@ -3,6 +3,7 @@ import type { ContentAvailability } from '../shared/types.ts'
 import { isSupportedTranscriptPath } from '../shared/routes.ts'
 import { resolveAvailability } from './availability.ts'
 import { measureBubble } from './measure.ts'
+import { patchMountedRange } from './patch.ts'
 import { buildPrefixSums } from './prefix-sums.ts'
 import { resolveSelectors } from './selectors.ts'
 import {
@@ -39,6 +40,10 @@ export function bootstrapContentScript(
     availability === 'available' && selectors !== null && scanResult !== null
       ? createTranscriptSessionState(selectors.scrollContainer, scanResult)
       : null
+
+  if (sessionState !== null) {
+    patchMountedRange(sessionState, 0, sessionState.records.length - 1)
+  }
 
   dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
 

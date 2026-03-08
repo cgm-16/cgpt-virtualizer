@@ -129,22 +129,22 @@
 
 ## 6. DOM patching core
 
-- [ ] Create top spacer helper
-- [ ] Create bottom spacer helper
-- [ ] Implement one-shot patch function for explicit `[start, end]` range
-- [ ] Compute spacer heights from prefix sums
-- [ ] Build mounted middle segment in `DocumentFragment`
-- [ ] Remove old mounted middle nodes
-- [ ] Insert new mounted segment between spacers
-- [ ] Update `BubbleRecord.mounted`
-- [ ] Preserve DOM order
-- [ ] Add integration tests for patching behavior
+- [x] Create top spacer helper
+- [x] Create bottom spacer helper
+- [x] Implement one-shot patch function for explicit `[start, end]` range
+- [x] Compute spacer heights from prefix sums
+- [x] Build mounted middle segment in `DocumentFragment`
+- [x] Remove old mounted middle nodes
+- [x] Insert new mounted segment between spacers
+- [x] Update `BubbleRecord.mounted`
+- [x] Preserve DOM order
+- [x] Add integration tests for patching behavior
 
 ### Acceptance criteria
-- [ ] Top and bottom spacers are inserted correctly
-- [ ] Requested range mounts correctly
-- [ ] Out-of-range nodes are detached
-- [ ] Mounted DOM order is preserved
+- [x] Top and bottom spacers are inserted correctly
+- [x] Requested range mounts correctly
+- [x] Out-of-range nodes are detached
+- [x] Mounted DOM order is preserved
 
 ---
 

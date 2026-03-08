@@ -193,19 +193,19 @@ describe('transcript scan integration', () => {
     expect(result.sessionState?.records[0]).toMatchObject({
       index: 0,
       measuredHeight: 0.5,
-      mounted: false,
+      mounted: true,
       pinned: false,
     })
     expect(result.sessionState?.records[1]).toMatchObject({
       index: 1,
       measuredHeight: 1.5,
-      mounted: false,
+      mounted: true,
       pinned: false,
     })
     expect(result.sessionState?.records[49]).toMatchObject({
       index: 49,
       measuredHeight: 49.5,
-      mounted: false,
+      mounted: true,
       pinned: false,
     })
     expect(result.sessionState?.records[0]?.node).toBe(fixture.bubbles[0])
@@ -214,6 +214,12 @@ describe('transcript scan integration', () => {
     expect(result.sessionState?.prefixSums[0]).toBe(0.5)
     expect(result.sessionState?.prefixSums[1]).toBe(2)
     expect(result.sessionState?.prefixSums[49]).toBe(1250)
+    expect(Array.from(fixture.transcriptRoot.children).at(0)).toBe(
+      fixture.transcriptRoot.querySelector('[data-cgpt-top-spacer]'),
+    )
+    expect(Array.from(fixture.transcriptRoot.children).at(-1)).toBe(
+      fixture.transcriptRoot.querySelector('[data-cgpt-bottom-spacer]'),
+    )
   })
 })
 
