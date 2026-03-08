@@ -352,21 +352,21 @@
 
 ## 17. Regression and performance coverage
 
-- [ ] Add regression tests for:
-  - [ ] selector failure
-  - [ ] memory guard
-  - [ ] unavailable popup state
-  - [ ] on/off toggle flow
-  - [ ] dirty rebuild after unsafe mutation
-  - [ ] streaming resume path
-- [ ] Add performance/debug instrumentation hooks
-- [ ] Add at least one assertion around mounted window size / mounted bubble count
-- [ ] Run full test suite cleanly
+- [x] Add regression tests for:
+  - [x] selector failure
+  - [x] memory guard
+  - [x] unavailable popup state
+  - [x] on/off toggle flow
+  - [x] dirty rebuild after unsafe mutation
+  - [x] streaming resume path
+- [x] Add performance/debug instrumentation hooks
+- [x] Add at least one assertion around mounted window size / mounted bubble count
+- [x] Run full test suite cleanly
 
 ### Acceptance criteria
-- [ ] Full test suite passes
-- [ ] Mounted window remains bounded as expected
-- [ ] Debug instrumentation can be enabled in development
+- [x] Full test suite passes
+- [x] Mounted window remains bounded as expected
+- [x] Debug instrumentation can be enabled in development
 
 ---
 

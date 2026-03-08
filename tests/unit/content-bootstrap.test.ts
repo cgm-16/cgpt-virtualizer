@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { bootstrapContentScript } from '../../src/content/bootstrap.ts'
+import { DEBUG_SESSION_STORAGE_KEY } from '../../src/content/debug.ts'
 import { resolveAvailability } from '../../src/content/availability.ts'
 import {
   CONTENT_SELECTOR_REGISTRY,
@@ -260,6 +261,42 @@ describe('transcript scan integration', () => {
     expect(result.sessionState?.records.slice(0, 4).every((record) => record.mounted)).toBe(true)
     expect(result.sessionState?.records.slice(4).every((record) => !record.mounted)).toBe(true)
     expect(Array.from(fixture.transcriptRoot.children)).toHaveLength(6)
+  })
+
+  it('debug mode가 켜져 있으면 초기 patch metrics를 기록한다', () => {
+    const bubbleHeights = Array.from({ length: 50 }, () => 100)
+    const fixture = makeMeasuredDocumentFixture(bubbleHeights, {
+      viewportHeight: 200,
+    })
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+
+    window.sessionStorage.setItem(DEBUG_SESSION_STORAGE_KEY, '1')
+
+    try {
+      bootstrapContentScript({
+        createResizeObserver: createNoopResizeObserver,
+        document: fixture.document,
+        pathname: '/c/example',
+        reportAvailability() {},
+        requestAnimationFrame(callback) {
+          callback(0)
+          return 1
+        },
+      })
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        '[cgpt-virtualizer]',
+        'patch-applied',
+        expect.objectContaining({
+          directChildCount: 6,
+          mountedBubbleCount: 4,
+          mountedRange: { end: 3, start: 0 },
+        }),
+      )
+    } finally {
+      window.sessionStorage.removeItem(DEBUG_SESSION_STORAGE_KEY)
+      debugSpy.mockRestore()
+    }
   })
 
   it('memory guard 임계값을 넘으면 세션을 정리하고 탭 비활성화를 요청한다', () => {
