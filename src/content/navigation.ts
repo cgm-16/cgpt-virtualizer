@@ -4,6 +4,10 @@ import {
   type ContentBootstrapDependencies,
   type ContentBootstrapResult,
 } from "./bootstrap.ts";
+import {
+  PAGE_NAVIGATION_MESSAGE_SOURCE,
+  PAGE_NAVIGATION_MESSAGE_TYPE,
+} from "./navigation-bridge.ts";
 
 type TranscriptConversationId = ReturnType<typeof extractConversationId>;
 type NavigationListener = (pathname: string) => void;
@@ -211,14 +215,40 @@ function createWindowNavigationState(
   const popstateListener = () => {
     emitNavigationSignal(dependencies.window.location.pathname);
   };
+  const pageNavigationListener = (event: MessageEvent<unknown>) => {
+    const data =
+      typeof event.data === "object" && event.data !== null ? event.data : null;
+
+    if (
+      data === null ||
+      !("source" in data) ||
+      data.source !== PAGE_NAVIGATION_MESSAGE_SOURCE ||
+      !("type" in data) ||
+      data.type !== PAGE_NAVIGATION_MESSAGE_TYPE
+    ) {
+      return;
+    }
+
+    const pathname =
+      "pathname" in data && typeof data.pathname === "string"
+        ? data.pathname
+        : dependencies.window.location.pathname;
+
+    emitNavigationSignal(pathname);
+  };
 
   dependencies.window.addEventListener("popstate", popstateListener);
+  dependencies.window.addEventListener("message", pageNavigationListener);
 
   return {
     disconnect() {
       restorePushState();
       restoreReplaceState();
       dependencies.window.removeEventListener("popstate", popstateListener);
+      dependencies.window.removeEventListener(
+        "message",
+        pageNavigationListener,
+      );
     },
     listeners,
   };
