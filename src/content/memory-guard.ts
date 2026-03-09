@@ -1,19 +1,19 @@
-import type { TranscriptSessionState } from './state.ts'
+import type { TranscriptSessionState } from "./state.ts";
 
 export interface DetachedCachePressure {
-  detachedNodeCount: number
-  estimatedDetachedHeight: number
+  detachedNodeCount: number;
+  estimatedDetachedHeight: number;
 }
 
 export interface MemoryGuardThreshold {
-  detachedNodeCount: number
-  estimatedDetachedHeight: number
+  detachedNodeCount: number;
+  estimatedDetachedHeight: number;
 }
 
 export const DEFAULT_MEMORY_GUARD_THRESHOLD: MemoryGuardThreshold = {
   detachedNodeCount: 2_000,
   estimatedDetachedHeight: 500_000,
-}
+};
 
 export function estimateDetachedCachePressure(
   state: TranscriptSessionState,
@@ -21,19 +21,19 @@ export function estimateDetachedCachePressure(
   return state.records.reduce<DetachedCachePressure>(
     (pressure, record) => {
       if (record.mounted) {
-        return pressure
+        return pressure;
       }
 
-      pressure.detachedNodeCount += 1
-      pressure.estimatedDetachedHeight += record.measuredHeight
+      pressure.detachedNodeCount += 1;
+      pressure.estimatedDetachedHeight += record.measuredHeight;
 
-      return pressure
+      return pressure;
     },
     {
       detachedNodeCount: 0,
       estimatedDetachedHeight: 0,
     },
-  )
+  );
 }
 
 export function shouldDisableVirtualizationForMemory(
@@ -43,5 +43,5 @@ export function shouldDisableVirtualizationForMemory(
   return (
     pressure.detachedNodeCount >= threshold.detachedNodeCount ||
     pressure.estimatedDetachedHeight >= threshold.estimatedDetachedHeight
-  )
+  );
 }

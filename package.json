@@ -9,13 +9,28 @@
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "vitest run",
     "pretest:integration": "pnpm run build",
-    "test:integration": "env -u NO_COLOR playwright test"
+    "test:integration": "env -u NO_COLOR playwright test",
+    "prepare": "husky",
+    "lint": "pnpm exec eslint",
+    "format": "prettier --write --ignore-unknown"
+  },
+  "lint-staged": {
+    "**/*": "prettier --write --ignore-unknown"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.3.5",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.4.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.6.1",
     "jsdom": "^28.1.0",
+    "lint-staged": "^16.3.2",
+    "prettier": "^3.8.1",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.56.1",
     "vite": "^8.0.0-beta.13",
     "vitest": "^4.0.18"
   },

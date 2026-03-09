@@ -1,71 +1,76 @@
-import { createReportContentAvailabilityMessage } from '../shared/messages.ts'
-import type { ContentAvailability } from '../shared/types.ts'
-import { isSupportedTranscriptPath } from '../shared/routes.ts'
+import { createReportContentAvailabilityMessage } from "../shared/messages.ts";
+import type { ContentAvailability } from "../shared/types.ts";
+import { isSupportedTranscriptPath } from "../shared/routes.ts";
 import {
   createAppendObserverManager,
   type MutationObserverLike,
-} from './append.ts'
-import { resolveAvailability } from './availability.ts'
-import { measureBubble } from './measure.ts'
-import { clearStreamingPlaceholder } from './placeholder.ts'
-import { buildPrefixSums } from './prefix-sums.ts'
+} from "./append.ts";
+import { resolveAvailability } from "./availability.ts";
+import { measureBubble } from "./measure.ts";
+import { clearStreamingPlaceholder } from "./placeholder.ts";
+import { buildPrefixSums } from "./prefix-sums.ts";
 import {
   createStructuralRebuildObserverManager,
   destroyTranscriptSession,
   requestDirtyRebuild,
   runDirtyRebuild,
-} from './rebuild.ts'
+} from "./rebuild.ts";
 import {
   createSelectorFailureObserverManager,
   handleSelectorStartupFailure,
   reportUnavailableStatus,
-} from './failure.ts'
-import { reportVirtualizationMetrics } from './debug.ts'
+} from "./failure.ts";
+import { reportVirtualizationMetrics } from "./debug.ts";
 import {
   DEFAULT_MEMORY_GUARD_THRESHOLD,
   estimateDetachedCachePressure,
   shouldDisableVirtualizationForMemory,
   type MemoryGuardThreshold,
-} from './memory-guard.ts'
+} from "./memory-guard.ts";
 import {
   createResizeObserverManager,
   type ResizeObserverLike,
-} from './resize.ts'
-import { disableCurrentTabVirtualization } from './runtime-control.ts'
+} from "./resize.ts";
+import { disableCurrentTabVirtualization } from "./runtime-control.ts";
 import {
   applyPendingAnchorCorrection,
   initializeScrollVirtualization,
-} from './scroll.ts'
-import { resolveSelectors } from './selectors.ts'
+} from "./scroll.ts";
+import { resolveSelectors } from "./selectors.ts";
 import {
   buildBubbleRecords,
   markAllRecordsMounted,
   type TranscriptSessionState,
-} from './state.ts'
+} from "./state.ts";
 import {
   createStreamingObserverManager,
   detectStreamingState,
-} from './streaming.ts'
-import { scanTranscript, type TranscriptScanResult } from './transcript-scan.ts'
+} from "./streaming.ts";
+import {
+  scanTranscript,
+  type TranscriptScanResult,
+} from "./transcript-scan.ts";
 
 export interface ContentBootstrapDependencies {
-  clearTimeout?(handle: number): void
-  createMutationObserver?(callback: MutationCallback): MutationObserverLike
-  createResizeObserver?(callback: ResizeObserverCallback): ResizeObserverLike
-  disableVirtualizationForMemoryGuard?(): Promise<void> | void
-  document: Document
-  memoryGuardThreshold?: MemoryGuardThreshold
-  pathname: string
-  reportAvailability(message: ReturnType<typeof createReportContentAvailabilityMessage>): void
-  requestAnimationFrame?(callback: FrameRequestCallback): number
-  setTimeout?(callback: () => void, delay: number): number
+  clearTimeout?(handle: number): void;
+  createMutationObserver?(callback: MutationCallback): MutationObserverLike;
+  createResizeObserver?(callback: ResizeObserverCallback): ResizeObserverLike;
+  disableVirtualizationForMemoryGuard?(): Promise<void> | void;
+  document: Document;
+  memoryGuardThreshold?: MemoryGuardThreshold;
+  pathname: string;
+  reportAvailability(
+    message: ReturnType<typeof createReportContentAvailabilityMessage>,
+  ): void;
+  requestAnimationFrame?(callback: FrameRequestCallback): number;
+  setTimeout?(callback: () => void, delay: number): number;
 }
 
 export interface ContentBootstrapResult {
-  availability: ContentAvailability
-  destroy(): void
-  scanResult: TranscriptScanResult | null
-  sessionState: TranscriptSessionState | null
+  availability: ContentAvailability;
+  destroy(): void;
+  scanResult: TranscriptScanResult | null;
+  sessionState: TranscriptSessionState | null;
 }
 
 export function bootstrapContentScript(
@@ -73,244 +78,287 @@ export function bootstrapContentScript(
 ): ContentBootstrapResult {
   const selectors = isSupportedTranscriptPath(dependencies.pathname)
     ? resolveSelectors(dependencies.document)
-    : null
-  const baseAvailability = resolveAvailability(dependencies.pathname, selectors)
+    : null;
+  const baseAvailability = resolveAvailability(
+    dependencies.pathname,
+    selectors,
+  );
 
-  if (baseAvailability === 'unavailable') {
+  if (baseAvailability === "unavailable") {
     return {
-      availability: handleSelectorStartupFailure(dependencies.reportAvailability),
+      availability: handleSelectorStartupFailure(
+        dependencies.reportAvailability,
+      ),
       destroy() {},
       scanResult: null,
       sessionState: null,
-    }
+    };
   }
 
-  const scanResult = selectors !== null ? scanTranscript(selectors) : null
+  const scanResult = selectors !== null ? scanTranscript(selectors) : null;
   const availability =
-    baseAvailability === 'available' && scanResult !== null && !scanResult.activationEligible
-      ? 'inactive'
-      : baseAvailability
+    baseAvailability === "available" &&
+    scanResult !== null &&
+    !scanResult.activationEligible
+      ? "inactive"
+      : baseAvailability;
   const sessionState =
-    availability === 'available' && selectors !== null && scanResult !== null
+    availability === "available" && selectors !== null && scanResult !== null
       ? createTranscriptSessionState(selectors.scrollContainer, scanResult)
-      : null
-  let destroy = () => {}
+      : null;
+  let destroy = () => {};
 
   if (sessionState !== null && selectors !== null) {
-    const activeSelectors = selectors
-    const activeSessionState = sessionState
-    let appendObserverManager: ReturnType<typeof createAppendObserverManager> | null = null
-    let resizeObserverManager: ReturnType<typeof createResizeObserverManager> | null = null
-    let selectorFailureObserverManager:
-      | ReturnType<typeof createSelectorFailureObserverManager>
-      | null = null
-    let structuralRebuildObserverManager:
-      | ReturnType<typeof createStructuralRebuildObserverManager>
-      | null = null
-    let streamingObserverManager: ReturnType<typeof createStreamingObserverManager> | null = null
-    let dirtyRebuildInProgress = false
-    let sessionClosed = false
-    let scrollController: ReturnType<typeof initializeScrollVirtualization> | null = null
+    const activeSelectors = selectors;
+    const activeSessionState = sessionState;
+    let appendObserverManager: ReturnType<
+      typeof createAppendObserverManager
+    > | null = null;
+    let resizeObserverManager: ReturnType<
+      typeof createResizeObserverManager
+    > | null = null;
+    let selectorFailureObserverManager: ReturnType<
+      typeof createSelectorFailureObserverManager
+    > | null = null;
+    let structuralRebuildObserverManager: ReturnType<
+      typeof createStructuralRebuildObserverManager
+    > | null = null;
+    let streamingObserverManager: ReturnType<
+      typeof createStreamingObserverManager
+    > | null = null;
+    let dirtyRebuildInProgress = false;
+    let sessionClosed = false;
+    let scrollController: ReturnType<
+      typeof initializeScrollVirtualization
+    > | null = null;
     const memoryGuardThreshold =
-      dependencies.memoryGuardThreshold ?? DEFAULT_MEMORY_GUARD_THRESHOLD
+      dependencies.memoryGuardThreshold ?? DEFAULT_MEMORY_GUARD_THRESHOLD;
 
     activeSessionState.isStreaming = detectStreamingState(
       dependencies.document,
       activeSelectors.streamingIndicatorSelector,
-    )
+    );
 
     if (activeSessionState.isStreaming) {
-      markAllRecordsMounted(activeSessionState)
+      markAllRecordsMounted(activeSessionState);
     }
 
     const disconnectObservers = () => {
-      appendObserverManager?.disconnect()
-      appendObserverManager = null
-      resizeObserverManager?.disconnect()
-      resizeObserverManager = null
-      selectorFailureObserverManager?.disconnect()
-      selectorFailureObserverManager = null
-      structuralRebuildObserverManager?.disconnect()
-      structuralRebuildObserverManager = null
-      streamingObserverManager?.disconnect()
-      streamingObserverManager = null
-    }
+      appendObserverManager?.disconnect();
+      appendObserverManager = null;
+      resizeObserverManager?.disconnect();
+      resizeObserverManager = null;
+      selectorFailureObserverManager?.disconnect();
+      selectorFailureObserverManager = null;
+      structuralRebuildObserverManager?.disconnect();
+      structuralRebuildObserverManager = null;
+      streamingObserverManager?.disconnect();
+      streamingObserverManager = null;
+    };
 
     const teardownSession = () => {
       if (sessionClosed) {
-        return false
+        return false;
       }
 
-      sessionClosed = true
-      disconnectObservers()
-      scrollController?.disconnect()
-      scrollController = null
-      destroyTranscriptSession(activeSessionState)
+      sessionClosed = true;
+      disconnectObservers();
+      scrollController?.disconnect();
+      scrollController = null;
+      destroyTranscriptSession(activeSessionState);
 
-      return true
-    }
+      return true;
+    };
 
     const handleMidSessionSelectorFailure = () => {
-      reportVirtualizationMetrics('selector-failure', activeSessionState)
+      reportVirtualizationMetrics("selector-failure", activeSessionState);
 
       if (!teardownSession()) {
-        return false
+        return false;
       }
 
-      reportUnavailableStatus(dependencies.reportAvailability)
+      reportUnavailableStatus(dependencies.reportAvailability);
 
-      return true
-    }
+      return true;
+    };
 
     scrollController = initializeScrollVirtualization(activeSessionState, {
       afterPatch() {
-        appendObserverManager?.flushPendingMutationRecords()
-        structuralRebuildObserverManager?.flushPendingMutationRecords()
-        resizeObserverManager?.refreshObservedRecords()
-        reportVirtualizationMetrics('patch-applied', activeSessionState)
-        maybeHandleMemoryGuard()
+        appendObserverManager?.flushPendingMutationRecords();
+        structuralRebuildObserverManager?.flushPendingMutationRecords();
+        resizeObserverManager?.refreshObservedRecords();
+        reportVirtualizationMetrics("patch-applied", activeSessionState);
+        maybeHandleMemoryGuard();
       },
-      requestAnimationFrame: dependencies.requestAnimationFrame ?? window.requestAnimationFrame.bind(window),
-    })
+      requestAnimationFrame:
+        dependencies.requestAnimationFrame ??
+        window.requestAnimationFrame.bind(window),
+    });
 
     function maybeHandleMemoryGuard(): boolean {
-      const pressure = estimateDetachedCachePressure(activeSessionState)
+      const pressure = estimateDetachedCachePressure(activeSessionState);
 
-      if (!shouldDisableVirtualizationForMemory(pressure, memoryGuardThreshold)) {
-        return false
+      if (
+        !shouldDisableVirtualizationForMemory(pressure, memoryGuardThreshold)
+      ) {
+        return false;
       }
 
-      reportVirtualizationMetrics('memory-guard-trip', activeSessionState)
+      reportVirtualizationMetrics("memory-guard-trip", activeSessionState);
 
       if (!teardownSession()) {
-        return false
+        return false;
       }
 
-      void (dependencies.disableVirtualizationForMemoryGuard ?? disableCurrentTabVirtualization)()
+      void (
+        dependencies.disableVirtualizationForMemoryGuard ??
+        disableCurrentTabVirtualization
+      )();
 
-      return true
+      return true;
     }
 
     destroy = () => {
-      teardownSession()
-    }
+      teardownSession();
+    };
 
     const runPendingDirtyRebuild = () => {
-      if (activeSessionState.dirtyRebuildReason === null || dirtyRebuildInProgress) {
-        return false
+      if (
+        activeSessionState.dirtyRebuildReason === null ||
+        dirtyRebuildInProgress
+      ) {
+        return false;
       }
 
-      dirtyRebuildInProgress = true
+      dirtyRebuildInProgress = true;
 
       try {
-        return runDirtyRebuild(activeSessionState, activeSessionState.dirtyRebuildReason, {
-          detectStreamingState,
-          disconnectObservers,
-          document: dependencies.document,
-          handleSelectorFailure() {
-            handleMidSessionSelectorFailure()
+        return runDirtyRebuild(
+          activeSessionState,
+          activeSessionState.dirtyRebuildReason,
+          {
+            detectStreamingState,
+            disconnectObservers,
+            document: dependencies.document,
+            handleSelectorFailure() {
+              handleMidSessionSelectorFailure();
+            },
+            measure: measureBubble,
+            reconnectObservers: connectObservers,
+            resolveSelectors,
+            schedulePatch(options) {
+              return scrollController?.schedulePatch(options) ?? false;
+            },
           },
-          measure: measureBubble,
-          reconnectObservers: connectObservers,
-          resolveSelectors,
-          schedulePatch(options) {
-            return scrollController?.schedulePatch(options) ?? false
-          },
-        })
+        );
       } finally {
-        dirtyRebuildInProgress = false
+        dirtyRebuildInProgress = false;
       }
-    }
+    };
 
     const requestDirtyRebuildAndMaybeRun = (
       state: TranscriptSessionState,
       reason: Parameters<typeof requestDirtyRebuild>[1],
     ) => {
-      requestDirtyRebuild(state, reason)
+      requestDirtyRebuild(state, reason);
 
       if (state.isStreaming) {
-        return
+        return;
       }
 
-      runPendingDirtyRebuild()
-    }
+      runPendingDirtyRebuild();
+    };
 
     function connectObservers(): void {
       resizeObserverManager = createResizeObserverManager(activeSessionState, {
         applyPendingCorrection() {
-          applyPendingAnchorCorrection(activeSessionState)
+          applyPendingAnchorCorrection(activeSessionState);
         },
         createResizeObserver:
-          dependencies.createResizeObserver ?? ((callback) => new ResizeObserver(callback)),
+          dependencies.createResizeObserver ??
+          ((callback) => new ResizeObserver(callback)),
         measure: measureBubble,
         schedulePatch() {
-          return scrollController?.schedulePatch() ?? false
+          return scrollController?.schedulePatch() ?? false;
         },
-      })
+      });
       appendObserverManager = createAppendObserverManager(activeSessionState, {
-        clearTimeout: dependencies.clearTimeout ?? window.clearTimeout.bind(window),
+        clearTimeout:
+          dependencies.clearTimeout ?? window.clearTimeout.bind(window),
         createMutationObserver:
-          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+          dependencies.createMutationObserver ??
+          ((callback) => new MutationObserver(callback)),
         isTranscriptBubble(node): node is Element {
-          return node instanceof Element && node.matches(activeSelectors.bubbleSelector)
+          return (
+            node instanceof Element &&
+            node.matches(activeSelectors.bubbleSelector)
+          );
         },
         measure: measureBubble,
         requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
         schedulePatch(options) {
-          return scrollController?.schedulePatch(options) ?? false
+          return scrollController?.schedulePatch(options) ?? false;
         },
         setTimeout: dependencies.setTimeout ?? window.setTimeout.bind(window),
-      })
-      structuralRebuildObserverManager = createStructuralRebuildObserverManager(activeSessionState, {
-        createMutationObserver:
-          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
-        requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
-      })
+      });
+      structuralRebuildObserverManager = createStructuralRebuildObserverManager(
+        activeSessionState,
+        {
+          createMutationObserver:
+            dependencies.createMutationObserver ??
+            ((callback) => new MutationObserver(callback)),
+          requestDirtyRebuild: requestDirtyRebuildAndMaybeRun,
+        },
+      );
       selectorFailureObserverManager = createSelectorFailureObserverManager({
         createMutationObserver:
-          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+          dependencies.createMutationObserver ??
+          ((callback) => new MutationObserver(callback)),
         document: dependencies.document,
         handleSelectorFailure() {
-          handleMidSessionSelectorFailure()
+          handleMidSessionSelectorFailure();
         },
         resolveSelectors,
-      })
+      });
       streamingObserverManager = createStreamingObserverManager({
         createMutationObserver:
-          dependencies.createMutationObserver ?? ((callback) => new MutationObserver(callback)),
+          dependencies.createMutationObserver ??
+          ((callback) => new MutationObserver(callback)),
         document: dependencies.document,
         onStreamingChange(nextIsStreaming) {
-          activeSessionState.isStreaming = nextIsStreaming
+          activeSessionState.isStreaming = nextIsStreaming;
 
           if (nextIsStreaming) {
-            return
+            return;
           }
 
-          clearStreamingPlaceholder(activeSessionState)
+          clearStreamingPlaceholder(activeSessionState);
 
           if (activeSessionState.dirtyRebuildReason !== null) {
-            runPendingDirtyRebuild()
-            return
+            runPendingDirtyRebuild();
+            return;
           }
 
-          appendObserverManager?.flushPendingAppends()
-          scrollController?.schedulePatch({ force: true })
+          appendObserverManager?.flushPendingAppends();
+          scrollController?.schedulePatch({ force: true });
         },
         streamingIndicatorSelector: activeSelectors.streamingIndicatorSelector,
-      })
-      resizeObserverManager.refreshObservedRecords()
-      selectorFailureObserverManager.sync()
-      streamingObserverManager.sync()
+      });
+      resizeObserverManager.refreshObservedRecords();
+      selectorFailureObserverManager.sync();
+      streamingObserverManager.sync();
     }
 
     if (!sessionClosed) {
-      connectObservers()
+      connectObservers();
     }
   }
 
-  dependencies.reportAvailability(createReportContentAvailabilityMessage(availability))
+  dependencies.reportAvailability(
+    createReportContentAvailabilityMessage(availability),
+  );
 
-  return { availability, destroy, scanResult, sessionState }
+  return { availability, destroy, scanResult, sessionState };
 }
 
 function createDefaultDependencies(): ContentBootstrapDependencies {
@@ -318,19 +366,19 @@ function createDefaultDependencies(): ContentBootstrapDependencies {
     document,
     pathname: window.location.pathname,
     reportAvailability(message) {
-      chrome.runtime.sendMessage(message)
+      chrome.runtime.sendMessage(message);
     },
     requestAnimationFrame(callback) {
-      return window.requestAnimationFrame(callback)
+      return window.requestAnimationFrame(callback);
     },
-  }
+  };
 }
 
 function createTranscriptSessionState(
   scrollContainer: HTMLElement,
   scanResult: TranscriptScanResult,
 ): TranscriptSessionState {
-  const records = buildBubbleRecords(scanResult.bubbles, measureBubble)
+  const records = buildBubbleRecords(scanResult.bubbles, measureBubble);
 
   return {
     anchor: null,
@@ -342,5 +390,5 @@ function createTranscriptSessionState(
     records,
     prefixSums: buildPrefixSums(records),
     mountedRange: null,
-  }
+  };
 }

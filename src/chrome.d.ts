@@ -1,9 +1,9 @@
 interface ChromeLastError {
-  message?: string
+  message?: string;
 }
 
 interface ChromeRuntimeMessageSender {
-  tab?: ChromeTab
+  tab?: ChromeTab;
 }
 
 interface ChromeRuntimeOnMessage {
@@ -13,33 +13,33 @@ interface ChromeRuntimeOnMessage {
       sender: ChromeRuntimeMessageSender,
       sendResponse: (response?: unknown) => void,
     ) => boolean | void,
-  ): void
+  ): void;
 }
 
 interface ChromeRuntimeApi {
-  lastError: ChromeLastError | undefined
-  onMessage: ChromeRuntimeOnMessage
-  sendMessage(message: unknown, callback?: (response: unknown) => void): void
+  lastError: ChromeLastError | undefined;
+  onMessage: ChromeRuntimeOnMessage;
+  sendMessage(message: unknown, callback?: (response: unknown) => void): void;
 }
 
 interface ChromeTab {
-  id?: number
+  id?: number;
 }
 
 interface ChromeTabsApi {
   query(
     queryInfo: {
-      active: boolean
-      currentWindow: boolean
+      active: boolean;
+      currentWindow: boolean;
     },
     callback: (tabs: ChromeTab[]) => void,
-  ): void
-  reload(tabId: number, callback?: () => void): void
+  ): void;
+  reload(tabId: number, callback?: () => void): void;
 }
 
 interface ChromeApi {
-  runtime: ChromeRuntimeApi
-  tabs: ChromeTabsApi
+  runtime: ChromeRuntimeApi;
+  tabs: ChromeTabsApi;
 }
 
-declare const chrome: ChromeApi
+declare const chrome: ChromeApi;

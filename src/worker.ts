@@ -1,55 +1,57 @@
 import {
   isContentToWorkerMessage,
   isPopupToWorkerMessage,
-} from './shared/messages.ts'
-import { handleContentMessage } from './background/content-controller.ts'
-import { handlePopupMessage } from './background/popup-controller.ts'
-import { createTabStateStore } from './background/tab-state.ts'
+} from "./shared/messages.ts";
+import { handleContentMessage } from "./background/content-controller.ts";
+import { handlePopupMessage } from "./background/popup-controller.ts";
+import { createTabStateStore } from "./background/tab-state.ts";
 
-const tabStateStore = createTabStateStore()
+const tabStateStore = createTabStateStore();
 
-chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
-  if (isContentToWorkerMessage(message)) {
-    void handleContentMessage(message, sender.tab?.id ?? null, {
-      refreshTab: refreshActiveTab,
+chrome.runtime.onMessage.addListener(
+  (message: unknown, sender, sendResponse) => {
+    if (isContentToWorkerMessage(message)) {
+      void handleContentMessage(message, sender.tab?.id ?? null, {
+        refreshTab: refreshActiveTab,
+        tabStateStore,
+      })
+        .then((response) => {
+          sendResponse(response);
+        })
+        .catch(() => {
+          sendResponse(null);
+        });
+
+      return true;
+    }
+
+    if (!isPopupToWorkerMessage(message)) {
+      return false;
+    }
+
+    void handlePopupMessage(message, {
+      getActiveTabId,
+      refreshActiveTab,
       tabStateStore,
-    })
-      .then((response) => {
-        sendResponse(response)
-      })
-      .catch(() => {
-        sendResponse(null)
-      })
+    }).then(sendResponse);
 
-    return true
-  }
-
-  if (!isPopupToWorkerMessage(message)) {
-    return false
-  }
-
-  void handlePopupMessage(message, {
-    getActiveTabId,
-    refreshActiveTab,
-    tabStateStore,
-  }).then(sendResponse)
-
-  return true
-})
+    return true;
+  },
+);
 
 function getActiveTabId(): Promise<number | null> {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTabId = tabs[0]?.id
-      resolve(typeof activeTabId === 'number' ? activeTabId : null)
-    })
-  })
+      const activeTabId = tabs[0]?.id;
+      resolve(typeof activeTabId === "number" ? activeTabId : null);
+    });
+  });
 }
 
 function refreshActiveTab(tabId: number): Promise<void> {
   return new Promise((resolve) => {
     chrome.tabs.reload(tabId, () => {
-      resolve()
-    })
-  })
+      resolve();
+    });
+  });
 }

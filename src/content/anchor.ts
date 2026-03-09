@@ -1,14 +1,14 @@
-import type { BubbleRecord } from './state.ts'
+import type { BubbleRecord } from "./state.ts";
 
 export interface AnchorSnapshot {
-  index: number
-  node: Element
-  offset: number
+  index: number;
+  node: Element;
+  offset: number;
 }
 
 export interface ViewportRect {
-  top: number
-  bottom: number
+  top: number;
+  bottom: number;
 }
 
 export function selectAnchorBubble(
@@ -17,38 +17,41 @@ export function selectAnchorBubble(
 ): BubbleRecord | null {
   for (const record of mountedRecords) {
     if (!record.mounted) {
-      continue
+      continue;
     }
 
-    const rect = record.node.getBoundingClientRect()
+    const rect = record.node.getBoundingClientRect();
 
     if (rect.bottom > viewportRect.top && rect.top < viewportRect.bottom) {
-      return record
+      return record;
     }
   }
 
-  return null
+  return null;
 }
 
-export function computeAnchorOffset(anchorNode: Element, viewportTop: number): number {
-  return anchorNode.getBoundingClientRect().top - viewportTop
+export function computeAnchorOffset(
+  anchorNode: Element,
+  viewportTop: number,
+): number {
+  return anchorNode.getBoundingClientRect().top - viewportTop;
 }
 
 export function captureAnchorSnapshot(
   mountedRecords: BubbleRecord[],
   viewportRect: ViewportRect,
 ): AnchorSnapshot | null {
-  const anchorBubble = selectAnchorBubble(mountedRecords, viewportRect)
+  const anchorBubble = selectAnchorBubble(mountedRecords, viewportRect);
 
   if (anchorBubble === null) {
-    return null
+    return null;
   }
 
   return {
     index: anchorBubble.index,
     node: anchorBubble.node,
     offset: computeAnchorOffset(anchorBubble.node, viewportRect.top),
-  }
+  };
 }
 
 export function accumulateScrollCorrection(
@@ -58,10 +61,10 @@ export function accumulateScrollCorrection(
   heightDelta: number,
 ): number {
   if (anchor === null || changedIndex >= anchor.index) {
-    return currentCorrection
+    return currentCorrection;
   }
 
-  return currentCorrection + heightDelta
+  return currentCorrection + heightDelta;
 }
 
 export function resolveAnchorCorrection(
@@ -69,10 +72,10 @@ export function resolveAnchorCorrection(
   viewportTop: number,
 ): number {
   if (anchor === null || !anchor.node.isConnected) {
-    return 0
+    return 0;
   }
 
-  return computeAnchorOffset(anchor.node, viewportTop) - anchor.offset
+  return computeAnchorOffset(anchor.node, viewportTop) - anchor.offset;
 }
 
 export function applyScrollCorrection(
@@ -80,8 +83,8 @@ export function applyScrollCorrection(
   correction: number,
 ): void {
   if (correction === 0) {
-    return
+    return;
   }
 
-  scrollContainer.scrollTop += correction
+  scrollContainer.scrollTop += correction;
 }

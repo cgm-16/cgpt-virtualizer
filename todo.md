@@ -1,6 +1,7 @@
 # TODO — ChatGPT Transcript Virtualization Extension (V1)
 
 ## Status legend
+
 - [ ] Not started
 - [x] Done
 - [~] In progress
@@ -20,6 +21,7 @@
 - [x] Verify test harness runs cleanly
 
 ### Acceptance criteria
+
 - [x] `pnpm run build` succeeds
 - [x] `pnpm run test` succeeds
 - [x] Extension can be loaded unpacked in Chrome
@@ -40,6 +42,7 @@
 - [x] Add unit tests for route matching and conversation ID parsing
 
 ### Acceptance criteria
+
 - [x] Valid transcript paths parse correctly
 - [x] Invalid paths are rejected
 - [x] Shared contracts are used by at least popup + worker
@@ -59,6 +62,7 @@
 - [x] Add tests for worker state logic
 
 ### Acceptance criteria
+
 - [x] Toggle state updates for active tab
 - [x] Toggling refreshes the page
 - [x] Popup can show `On`, `Off`, or `Unavailable`
@@ -82,6 +86,7 @@
 - [x] Add integration tests for bootstrap availability states
 
 ### Acceptance criteria
+
 - [x] Selector failure reports `Unavailable`
 - [x] Non-transcript routes do not activate
 - [x] Transcript route can reach available state
@@ -103,6 +108,7 @@
 - [x] Add tests for bubble ordering
 
 ### Acceptance criteria
+
 - [x] 49 bubbles => inactive
 - [x] 50 bubbles => eligible
 - [x] Bubble ordering is stable and correct
@@ -121,6 +127,7 @@
 - [x] Add unit tests for prefix sums and suffix rebuild
 
 ### Acceptance criteria
+
 - [x] All eligible bubbles are measured into ordered records
 - [x] Prefix sums are correct
 - [x] Suffix updates work correctly after a changed index
@@ -141,6 +148,7 @@
 - [x] Add integration tests for patching behavior
 
 ### Acceptance criteria
+
 - [x] Top and bottom spacers are inserted correctly
 - [x] Requested range mounts correctly
 - [x] Out-of-range nodes are detached
@@ -163,6 +171,7 @@
 - [x] Add integration tests for scroll-triggered range changes
 
 ### Acceptance criteria
+
 - [x] Initial activation mounts the expected range
 - [x] Scroll updates mounted range when needed
 - [x] No-op scroll does not schedule unnecessary work
@@ -180,6 +189,7 @@
 - [x] Add unit tests for anchor math and correction logic
 
 ### Acceptance criteria
+
 - [x] Anchor bubble selection is correct
 - [x] Offset calculation is correct
 - [x] No-anchor case behaves safely
@@ -200,6 +210,7 @@
 - [x] Add integration tests for resize behavior
 
 ### Acceptance criteria
+
 - [x] Mounted bubble resize updates state
 - [x] Detached bubbles are not observed
 - [x] Anchor-preserving correction is applied when appropriate
@@ -225,6 +236,7 @@
 - [x] Add integration tests for append batching
 
 ### Acceptance criteria
+
 - [x] Clean tail appends are accepted incrementally
 - [x] Invalid append patterns are rejected
 - [x] Append bursts batch correctly
@@ -241,6 +253,7 @@
 - [x] Add integration tests for both append outcomes
 
 ### Acceptance criteria
+
 - [x] Near-bottom appends follow the bottom
 - [x] Non-near-bottom appends remain detached
 - [x] Bottom spacer reflects detached appended content correctly
@@ -262,6 +275,7 @@
 - [x] Add integration tests for streaming pause behavior
 
 ### Acceptance criteria
+
 - [x] Mount/unmount pauses during streaming
 - [x] Resize updates still apply during streaming
 - [x] Placeholder appears when needed
@@ -291,6 +305,7 @@
 - [x] Add integration tests for rebuild scenarios
 
 ### Acceptance criteria
+
 - [x] Dirty rebuild restores a valid transcript session
 - [x] Surviving anchor restores position when possible
 - [x] Fallback to raw `scrollTop` works safely
@@ -313,6 +328,7 @@
 - [x] Add integration tests for navigation/session reset
 
 ### Acceptance criteria
+
 - [x] Conversation ID change triggers full session reset
 - [x] Same conversation ID does not trigger destructive reset
 - [x] Non-transcript routes stay idle
@@ -328,6 +344,7 @@
 - [x] Add regression tests for unavailable behavior
 
 ### Acceptance criteria
+
 - [x] Selector failure is surfaced clearly
 - [x] Virtualization stops safely on mid-session failure
 - [x] Popup reflects `Unavailable`
@@ -344,6 +361,7 @@
 - [x] Add tests for memory guard path
 
 ### Acceptance criteria
+
 - [x] Memory guard can be triggered in tests
 - [x] Trigger path disables virtualization safely
 - [x] Restore-through-refresh path is wired
@@ -364,6 +382,7 @@
 - [x] Run full test suite cleanly
 
 ### Acceptance criteria
+
 - [x] Full test suite passes
 - [x] Mounted window remains bounded as expected
 - [x] Debug instrumentation can be enabled in development
@@ -383,6 +402,7 @@
 - [ ] Verify selector-failure handling strategy in a controlled dev scenario
 
 ### Ship checklist
+
 - [ ] Build is reproducible
 - [ ] Tests pass locally
 - [ ] No orphaned modules

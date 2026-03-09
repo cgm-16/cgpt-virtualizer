@@ -1,242 +1,243 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createStructuralRebuildObserverManager,
   runDirtyRebuild,
-} from '../../src/content/rebuild.ts'
-import type { MutationObserverLike } from '../../src/content/append.ts'
-import type { BubbleRecord, TranscriptSessionState } from '../../src/content/state.ts'
+} from "../../src/content/rebuild.ts";
+import type { MutationObserverLike } from "../../src/content/append.ts";
+import type {
+  BubbleRecord,
+  TranscriptSessionState,
+} from "../../src/content/state.ts";
 
-describe('runDirtyRebuild', () => {
-  it('rehydrates detached records around the live mounted DOM and restores scrollTop from a surviving anchor', () => {
-    const fixture = makeDirtyRebuildFixture()
-    const disconnectObservers = vi.fn()
-    const reconnectObservers = vi.fn()
-    const schedulePatch = vi.fn(() => true)
+describe("runDirtyRebuild", () => {
+  it("rehydrates detached records around the live mounted DOM and restores scrollTop from a surviving anchor", () => {
+    const fixture = makeDirtyRebuildFixture();
+    const disconnectObservers = vi.fn();
+    const reconnectObservers = vi.fn();
+    const schedulePatch = vi.fn(() => true);
 
     fixture.sessionState.anchor = {
       index: 4,
       node: fixture.bubbles[4]!,
       offset: 0,
-    }
+    };
     fixture.bubbles[4]!.getBoundingClientRect = () =>
       makeDomRect({
         bottom: 0,
         left: 0,
         right: 100,
         top: -100,
-      })
-    fixture.transcriptRoot.removeChild(fixture.bubbles[3]!)
+      });
+    fixture.transcriptRoot.removeChild(fixture.bubbles[3]!);
 
-    const didRebuild = runDirtyRebuild(fixture.sessionState, 'append-removal', {
-      bubbleSelector: '[data-cgpt-transcript-bubble]',
+    const didRebuild = runDirtyRebuild(fixture.sessionState, "append-removal", {
+      bubbleSelector: "[data-cgpt-transcript-bubble]",
       detectStreamingState() {
-        return false
+        return false;
       },
       disconnectObservers,
       document,
       measure(node) {
-        return fixture.measuredHeights.get(node) ?? 0
+        return fixture.measuredHeights.get(node) ?? 0;
       },
       reconnectObservers,
       resolveSelectors() {
         return {
-          bubbleSelector: '[data-cgpt-transcript-bubble]',
+          bubbleSelector: "[data-cgpt-transcript-bubble]",
           scrollContainer: fixture.scrollContainer,
-          streamingIndicatorSelector: '[data-cgpt-streaming-indicator]',
+          streamingIndicatorSelector: "[data-cgpt-streaming-indicator]",
           transcriptRoot: fixture.transcriptRoot,
-        }
+        };
       },
       schedulePatch,
-      streamingIndicatorSelector: '[data-cgpt-streaming-indicator]',
-    })
+      streamingIndicatorSelector: "[data-cgpt-streaming-indicator]",
+    });
 
-    expect(didRebuild).toBe(true)
-    expect(disconnectObservers).toHaveBeenCalledTimes(1)
-    expect(reconnectObservers).toHaveBeenCalledTimes(1)
-    expect(schedulePatch).toHaveBeenCalledWith({ force: true })
-    expect(fixture.scrollContainer.scrollTop).toBe(300)
-    expect(fixture.sessionState.records.map((record) => record.node.textContent)).toEqual([
-      'Bubble 0',
-      'Bubble 1',
-      'Bubble 2',
-      'Bubble 4',
-      'Bubble 5',
-    ])
-    expect(fixture.sessionState.prefixSums).toEqual([100, 200, 300, 400, 500])
-    expect(fixture.sessionState.dirtyRebuildReason).toBeNull()
-  })
+    expect(didRebuild).toBe(true);
+    expect(disconnectObservers).toHaveBeenCalledTimes(1);
+    expect(reconnectObservers).toHaveBeenCalledTimes(1);
+    expect(schedulePatch).toHaveBeenCalledWith({ force: true });
+    expect(fixture.scrollContainer.scrollTop).toBe(300);
+    expect(
+      fixture.sessionState.records.map((record) => record.node.textContent),
+    ).toEqual(["Bubble 0", "Bubble 1", "Bubble 2", "Bubble 4", "Bubble 5"]);
+    expect(fixture.sessionState.prefixSums).toEqual([100, 200, 300, 400, 500]);
+    expect(fixture.sessionState.dirtyRebuildReason).toBeNull();
+  });
 
-  it('falls back to raw scrollTop when the anchor bubble no longer survives', () => {
-    const fixture = makeDirtyRebuildFixture()
-    const schedulePatch = vi.fn(() => true)
+  it("falls back to raw scrollTop when the anchor bubble no longer survives", () => {
+    const fixture = makeDirtyRebuildFixture();
+    const schedulePatch = vi.fn(() => true);
 
-    fixture.transcriptRoot.removeChild(fixture.bubbles[4]!)
+    fixture.transcriptRoot.removeChild(fixture.bubbles[4]!);
 
-    const didRebuild = runDirtyRebuild(fixture.sessionState, 'append-removal', {
-      bubbleSelector: '[data-cgpt-transcript-bubble]',
+    const didRebuild = runDirtyRebuild(fixture.sessionState, "append-removal", {
+      bubbleSelector: "[data-cgpt-transcript-bubble]",
       detectStreamingState() {
-        return false
+        return false;
       },
       disconnectObservers() {},
       document,
       measure(node) {
-        return fixture.measuredHeights.get(node) ?? 0
+        return fixture.measuredHeights.get(node) ?? 0;
       },
       reconnectObservers() {},
       resolveSelectors() {
         return {
-          bubbleSelector: '[data-cgpt-transcript-bubble]',
+          bubbleSelector: "[data-cgpt-transcript-bubble]",
           scrollContainer: fixture.scrollContainer,
-          streamingIndicatorSelector: '[data-cgpt-streaming-indicator]',
+          streamingIndicatorSelector: "[data-cgpt-streaming-indicator]",
           transcriptRoot: fixture.transcriptRoot,
-        }
+        };
       },
       schedulePatch,
-      streamingIndicatorSelector: '[data-cgpt-streaming-indicator]',
-    })
+      streamingIndicatorSelector: "[data-cgpt-streaming-indicator]",
+    });
 
-    expect(didRebuild).toBe(true)
-    expect(schedulePatch).toHaveBeenCalledWith({ force: true })
-    expect(fixture.scrollContainer.scrollTop).toBe(400)
-    expect(fixture.sessionState.records.map((record) => record.node.textContent)).toEqual([
-      'Bubble 0',
-      'Bubble 1',
-      'Bubble 2',
-      'Bubble 3',
-      'Bubble 5',
-    ])
-  })
+    expect(didRebuild).toBe(true);
+    expect(schedulePatch).toHaveBeenCalledWith({ force: true });
+    expect(fixture.scrollContainer.scrollTop).toBe(400);
+    expect(
+      fixture.sessionState.records.map((record) => record.node.textContent),
+    ).toEqual(["Bubble 0", "Bubble 1", "Bubble 2", "Bubble 3", "Bubble 5"]);
+  });
 
-  it('enters selector failure handling when selectors can no longer be resolved', () => {
-    const fixture = makeDirtyRebuildFixture()
-    const disconnectObservers = vi.fn()
-    const reconnectObservers = vi.fn()
-    const handleSelectorFailure = vi.fn()
-    const schedulePatch = vi.fn(() => true)
+  it("enters selector failure handling when selectors can no longer be resolved", () => {
+    const fixture = makeDirtyRebuildFixture();
+    const disconnectObservers = vi.fn();
+    const reconnectObservers = vi.fn();
+    const handleSelectorFailure = vi.fn();
+    const schedulePatch = vi.fn(() => true);
 
-    const didRebuild = runDirtyRebuild(fixture.sessionState, 'append-removal', {
+    const didRebuild = runDirtyRebuild(fixture.sessionState, "append-removal", {
       detectStreamingState() {
-        return false
+        return false;
       },
       disconnectObservers,
       document,
       handleSelectorFailure,
       measure(node) {
-        return fixture.measuredHeights.get(node) ?? 0
+        return fixture.measuredHeights.get(node) ?? 0;
       },
       reconnectObservers,
       resolveSelectors() {
-        return null
+        return null;
       },
       schedulePatch,
-    })
+    });
 
-    expect(didRebuild).toBe(false)
-    expect(disconnectObservers).toHaveBeenCalledTimes(1)
-    expect(handleSelectorFailure).toHaveBeenCalledTimes(1)
-    expect(reconnectObservers).not.toHaveBeenCalled()
-    expect(schedulePatch).not.toHaveBeenCalled()
-  })
-})
+    expect(didRebuild).toBe(false);
+    expect(disconnectObservers).toHaveBeenCalledTimes(1);
+    expect(handleSelectorFailure).toHaveBeenCalledTimes(1);
+    expect(reconnectObservers).not.toHaveBeenCalled();
+    expect(schedulePatch).not.toHaveBeenCalled();
+  });
+});
 
-describe('createStructuralRebuildObserverManager', () => {
-  it('requests a dirty rebuild for unsafe subtree childList mutations', () => {
-    const fixture = makeDirtyRebuildFixture()
-    let callback: MutationCallback | null = null
-    const requestDirtyRebuild = vi.fn()
+describe("createStructuralRebuildObserverManager", () => {
+  it("requests a dirty rebuild for unsafe subtree childList mutations", () => {
+    const fixture = makeDirtyRebuildFixture();
+    let callback: MutationCallback | null = null;
+    const requestDirtyRebuild = vi.fn();
 
     createStructuralRebuildObserverManager(fixture.sessionState, {
       createMutationObserver(nextCallback) {
-        callback = nextCallback
-        return createNoopMutationObserver()
+        callback = nextCallback;
+        return createNoopMutationObserver();
       },
       requestDirtyRebuild,
-    })
+    });
 
-    const nestedNode = document.createElement('span')
-    fixture.bubbles[4]?.append(nestedNode)
+    const nestedNode = document.createElement("span");
+    fixture.bubbles[4]?.append(nestedNode);
     callback?.(
       [makeChildListMutationRecord(fixture.bubbles[4]!, [nestedNode])],
       {} as MutationObserver,
-    )
+    );
 
     expect(requestDirtyRebuild).toHaveBeenCalledWith(
       fixture.sessionState,
-      'unsafe-structural-change',
-    )
-  })
+      "unsafe-structural-change",
+    );
+  });
 
-  it('requests a dirty rebuild for unsafe subtree characterData mutations', () => {
-    const fixture = makeDirtyRebuildFixture()
-    let callback: MutationCallback | null = null
-    const requestDirtyRebuild = vi.fn()
-    const textNode = document.createTextNode('before')
+  it("requests a dirty rebuild for unsafe subtree characterData mutations", () => {
+    const fixture = makeDirtyRebuildFixture();
+    let callback: MutationCallback | null = null;
+    const requestDirtyRebuild = vi.fn();
+    const textNode = document.createTextNode("before");
 
-    fixture.bubbles[4]?.append(textNode)
+    fixture.bubbles[4]?.append(textNode);
 
     createStructuralRebuildObserverManager(fixture.sessionState, {
       createMutationObserver(nextCallback) {
-        callback = nextCallback
-        return createNoopMutationObserver()
+        callback = nextCallback;
+        return createNoopMutationObserver();
       },
       requestDirtyRebuild,
-    })
+    });
 
-    textNode.data = 'after'
+    textNode.data = "after";
     callback?.(
       [makeCharacterDataMutationRecord(textNode)],
       {} as MutationObserver,
-    )
+    );
 
     expect(requestDirtyRebuild).toHaveBeenCalledWith(
       fixture.sessionState,
-      'unsafe-structural-change',
-    )
-  })
-})
+      "unsafe-structural-change",
+    );
+  });
+});
 
 function makeDirtyRebuildFixture(): {
-  bubbles: HTMLElement[]
-  measuredHeights: Map<Element, number>
-  scrollContainer: HTMLElement
-  sessionState: TranscriptSessionState
-  transcriptRoot: HTMLElement
+  bubbles: HTMLElement[];
+  measuredHeights: Map<Element, number>;
+  scrollContainer: HTMLElement;
+  sessionState: TranscriptSessionState;
+  transcriptRoot: HTMLElement;
 } {
-  document.body.innerHTML = ''
+  document.body.innerHTML = "";
 
-  const scrollContainer = document.createElement('main')
-  const transcriptRoot = document.createElement('section')
-  const streamingIndicator = document.createElement('div')
-  const measuredHeights = new Map<Element, number>()
+  const scrollContainer = document.createElement("main");
+  const transcriptRoot = document.createElement("section");
+  const streamingIndicator = document.createElement("div");
+  const measuredHeights = new Map<Element, number>();
   const bubbles = Array.from({ length: 6 }, (_, index) => {
-    const bubble = createBubble(`Bubble ${index}`)
-    measuredHeights.set(bubble, 100)
-    return bubble
-  })
+    const bubble = createBubble(`Bubble ${index}`);
+    measuredHeights.set(bubble, 100);
+    return bubble;
+  });
 
-  const topSpacer = document.createElement('div')
-  topSpacer.setAttribute('data-cgpt-top-spacer', '')
-  const bottomSpacer = document.createElement('div')
-  bottomSpacer.setAttribute('data-cgpt-bottom-spacer', '')
+  const topSpacer = document.createElement("div");
+  topSpacer.setAttribute("data-cgpt-top-spacer", "");
+  const bottomSpacer = document.createElement("div");
+  bottomSpacer.setAttribute("data-cgpt-bottom-spacer", "");
 
-  transcriptRoot.append(topSpacer, bubbles[3]!, bubbles[4]!, bubbles[5]!, bottomSpacer)
-  scrollContainer.append(transcriptRoot, streamingIndicator)
-  scrollContainer.scrollTop = 400
-  document.body.append(scrollContainer)
+  transcriptRoot.append(
+    topSpacer,
+    bubbles[3]!,
+    bubbles[4]!,
+    bubbles[5]!,
+    bottomSpacer,
+  );
+  scrollContainer.append(transcriptRoot, streamingIndicator);
+  scrollContainer.scrollTop = 400;
+  document.body.append(scrollContainer);
 
-  Object.defineProperty(scrollContainer, 'clientHeight', {
+  Object.defineProperty(scrollContainer, "clientHeight", {
     configurable: true,
     value: 200,
-  })
+  });
   scrollContainer.getBoundingClientRect = () =>
     makeDomRect({
       bottom: 200,
       left: 0,
       right: 100,
       top: 0,
-    })
+    });
 
   bubbles[3]!.getBoundingClientRect = () =>
     makeDomRect({
@@ -244,29 +245,31 @@ function makeDirtyRebuildFixture(): {
       left: 0,
       right: 100,
       top: -100,
-    })
+    });
   bubbles[4]!.getBoundingClientRect = () =>
     makeDomRect({
       bottom: 100,
       left: 0,
       right: 100,
       top: 0,
-    })
+    });
   bubbles[5]!.getBoundingClientRect = () =>
     makeDomRect({
       bottom: 200,
       left: 0,
       right: 100,
       top: 100,
-    })
+    });
 
-  const records = bubbles.map((bubble, index): BubbleRecord => ({
-    index,
-    measuredHeight: 100,
-    mounted: index >= 3,
-    node: bubble,
-    pinned: false,
-  }))
+  const records = bubbles.map(
+    (bubble, index): BubbleRecord => ({
+      index,
+      measuredHeight: 100,
+      mounted: index >= 3,
+      node: bubble,
+      pinned: false,
+    }),
+  );
 
   return {
     bubbles,
@@ -284,16 +287,16 @@ function makeDirtyRebuildFixture(): {
       transcriptRoot,
     },
     transcriptRoot,
-  }
+  };
 }
 
 function createBubble(label: string): HTMLElement {
-  const bubble = document.createElement('article')
+  const bubble = document.createElement("article");
 
-  bubble.setAttribute('data-cgpt-transcript-bubble', '')
-  bubble.textContent = label
+  bubble.setAttribute("data-cgpt-transcript-bubble", "");
+  bubble.textContent = label;
 
-  return bubble
+  return bubble;
 }
 
 function createNoopMutationObserver(): MutationObserverLike {
@@ -301,9 +304,9 @@ function createNoopMutationObserver(): MutationObserverLike {
     disconnect() {},
     observe() {},
     takeRecords() {
-      return []
+      return [];
     },
-  }
+  };
 }
 
 function makeChildListMutationRecord(
@@ -320,35 +323,37 @@ function makeChildListMutationRecord(
     previousSibling: null,
     removedNodes: removedNodes as unknown as NodeList,
     target,
-    type: 'childList',
-  } as MutationRecord
+    type: "childList",
+  } as MutationRecord;
 }
 
-function makeCharacterDataMutationRecord(target: CharacterData): MutationRecord {
+function makeCharacterDataMutationRecord(
+  target: CharacterData,
+): MutationRecord {
   return {
     addedNodes: [] as unknown as NodeList,
     attributeName: null,
     attributeNamespace: null,
     nextSibling: null,
-    oldValue: 'before',
+    oldValue: "before",
     previousSibling: null,
     removedNodes: [] as unknown as NodeList,
     target,
-    type: 'characterData',
-  } as MutationRecord
+    type: "characterData",
+  } as MutationRecord;
 }
 
 function makeDomRect(
-  rect: Pick<DOMRect, 'bottom' | 'left' | 'right' | 'top'>,
+  rect: Pick<DOMRect, "bottom" | "left" | "right" | "top">,
 ): DOMRect {
   return {
     ...rect,
     height: rect.bottom - rect.top,
     toJSON() {
-      return this
+      return this;
     },
     width: rect.right - rect.left,
     x: rect.left,
     y: rect.top,
-  } as DOMRect
+  } as DOMRect;
 }

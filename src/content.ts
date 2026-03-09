@@ -1,3 +1,3 @@
-import { bootstrapContentEntry } from './content/startup.ts'
+import { bootstrapContentEntry } from "./content/startup.ts";
 
-void bootstrapContentEntry()
+void bootstrapContentEntry();

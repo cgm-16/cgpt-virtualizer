@@ -6,13 +6,13 @@ Below is a pragmatic build plan based on the V1 spec we locked. I sized the step
 
 Build a Chrome MV3 extension that virtualizes only the main ChatGPT transcript by:
 
-* indexing top-level transcript bubbles,
-* measuring them,
-* replacing offscreen regions with one top spacer and one bottom spacer,
-* keeping one mounted middle segment with overscan,
-* remounting the original DOM nodes as bubbles re-enter range,
-* handling clean tail appends incrementally,
-* and rebuilding aggressively on ambiguity.
+- indexing top-level transcript bubbles,
+- measuring them,
+- replacing offscreen regions with one top spacer and one bottom spacer,
+- keeping one mounted middle segment with overscan,
+- remounting the original DOM nodes as bubbles re-enter range,
+- handling clean tail appends incrementally,
+- and rebuilding aggressively on ambiguity.
 
 ## 1.2 Engineering principles
 
@@ -28,29 +28,26 @@ Build a Chrome MV3 extension that virtualizes only the main ChatGPT transcript b
 
 Three runtime pieces:
 
-* **Content script**
+- **Content script**
+  - transcript detection
+  - selector resolution
+  - indexing and measurement
+  - range calculation
+  - DOM patching
+  - resize handling
+  - append handling
+  - streaming pause
+  - rebuild logic
+  - navigation/session change handling
 
-  * transcript detection
-  * selector resolution
-  * indexing and measurement
-  * range calculation
-  * DOM patching
-  * resize handling
-  * append handling
-  * streaming pause
-  * rebuild logic
-  * navigation/session change handling
+- **Service worker**
+  - per-tab toggle state
+  - popup messaging
+  - refresh trigger requests
 
-* **Service worker**
-
-  * per-tab toggle state
-  * popup messaging
-  * refresh trigger requests
-
-* **Popup**
-
-  * On/Off toggle
-  * short status line
+- **Popup**
+  - On/Off toggle
+  - short status line
 
 ## 1.4 Suggested repo structure
 
@@ -98,30 +95,27 @@ extension/
 
 Use three layers from day one:
 
-* **Unit tests**
+- **Unit tests**
+  - prefix sums
+  - binary search range lookup
+  - anchor math
+  - append batch validation
+  - near-bottom checks
+  - conversation path parsing
 
-  * prefix sums
-  * binary search range lookup
-  * anchor math
-  * append batch validation
-  * near-bottom checks
-  * conversation path parsing
+- **Integration tests**
+  - synthetic transcript DOM fixtures
+  - spacer insertion
+  - patch results
+  - remount order
+  - resize correction behavior
+  - dirty rebuild transitions
 
-* **Integration tests**
-
-  * synthetic transcript DOM fixtures
-  * spacer insertion
-  * patch results
-  * remount order
-  * resize correction behavior
-  * dirty rebuild transitions
-
-* **E2E tests**
-
-  * extension loads
-  * popup toggles work
-  * transcript detection works on a controlled fixture page
-  * later, limited manual validation on ChatGPT itself
+- **E2E tests**
+  - extension loads
+  - popup toggles work
+  - transcript detection works on a controlled fixture page
+  - later, limited manual validation on ChatGPT itself
 
 This split matters because `getBoundingClientRect()` and scroll/layout behavior are browser-layout concerns, while range math and append validation are pure logic. MDN documents `getBoundingClientRect()` as viewport-relative layout data, and `pushState()` / `popstate` as session-history navigation primitives, which is why browser-level tests are still needed around those edges. ([MDN][4])
 
@@ -151,9 +145,9 @@ These are still too large for safe codegen.
 
 Break those down into smaller slices that each:
 
-* add one new capability,
-* integrate with existing code,
-* and end in a testable state.
+- add one new capability,
+- integrate with existing code,
+- and end in a testable state.
 
 Final right-sized sequence:
 
@@ -994,12 +988,12 @@ Output:
 
 A few pragmatic notes before coding:
 
-* Use synthetic DOM fixtures heavily for transcript integration tests. It will save time and reduce brittleness.
-* Keep selector definitions in exactly one module.
-* Keep range math pure and separately tested.
-* Treat rebuild as the “safety escape hatch,” not a failure.
-* Avoid over-abstracting until after Step 10 or later.
-* Keep debug logging behind a flag from the beginning.
+- Use synthetic DOM fixtures heavily for transcript integration tests. It will save time and reduce brittleness.
+- Keep selector definitions in exactly one module.
+- Keep range math pure and separately tested.
+- Treat rebuild as the “safety escape hatch,” not a failure.
+- Avoid over-abstracting until after Step 10 or later.
+- Keep debug logging behind a flag from the beginning.
 
 If you want, I can turn this next into a **checklist version for a human developer** or a **single consolidated master prompt plus these step prompts**.
 
