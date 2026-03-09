@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
 /**
  * Read environment variables from file.
@@ -32,11 +32,10 @@ export default defineConfig({
     trace: "on-first-retry",
   },
 
-  /* 익스텐션은 Chromium에서만 지원됨 */
+  /* 익스텐션은 custom persistent Chromium fixture를 사용함 */
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: "extension",
     },
 
     /* Test against mobile viewports. */
