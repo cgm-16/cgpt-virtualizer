@@ -21,8 +21,8 @@ interface ExtensionFixtures {
 }
 
 export const test = base.extend<ExtensionFixtures>({
-  context: async (fixtures, use) => {
-    void fixtures;
+  context: async ({ browserName }, use) => {
+    void browserName;
     const userDataDirectory = await mkdtemp(
       join(tmpdir(), "cgpt-virtualizer-playwright-"),
     );
