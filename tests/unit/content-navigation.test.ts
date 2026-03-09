@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PAGE_NAVIGATION_MESSAGE_TYPE } from "../../src/content/navigation-bridge.ts";
 import {
   installNavigationHooks,
   shouldResetSession,
@@ -45,6 +46,16 @@ describe("installNavigationHooks", () => {
     window.history.pushState({}, "", "/c/next");
     window.history.replaceState({}, "", "/c/final");
     window.dispatchEvent(new PopStateEvent("popstate"));
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          pathname: "/c/page-bridge",
+          source: "cgpt-virtualizer",
+          type: PAGE_NAVIGATION_MESSAGE_TYPE,
+        },
+        source: window,
+      }),
+    );
 
     expect(pathnames).toEqual([]);
 
@@ -52,7 +63,12 @@ describe("installNavigationHooks", () => {
       callback();
     });
 
-    expect(pathnames).toEqual(["/c/next", "/c/final", "/c/final"]);
+    expect(pathnames).toEqual([
+      "/c/next",
+      "/c/final",
+      "/c/final",
+      "/c/page-bridge",
+    ]);
 
     controller.disconnect();
 
@@ -62,7 +78,12 @@ describe("installNavigationHooks", () => {
       callback();
     });
 
-    expect(pathnames).toEqual(["/c/next", "/c/final", "/c/final"]);
+    expect(pathnames).toEqual([
+      "/c/next",
+      "/c/final",
+      "/c/final",
+      "/c/page-bridge",
+    ]);
   });
 });
 

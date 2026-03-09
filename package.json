@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "build": "tsc && vite build",
-    "watch": "vite build --watch",
+    "build": "tsc && node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "vitest run",
     "pretest:integration": "pnpm run build",
