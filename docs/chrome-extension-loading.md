@@ -26,10 +26,17 @@ pnpm run build
 빌드가 끝나면 `dist/` 아래에 Chrome이 읽을 unpacked extension 산출물이 생깁니다.
 
 - `dist/manifest.json`
+- `dist/content-page.js`
 - `dist/content.js`
 - `dist/popup.html`
 - `dist/popup.js`
 - `dist/worker.js`
+
+현재 빌드는 런타임별로 분리되어 있습니다.
+
+- `content-page.js`: MAIN world에서 SPA 네비게이션 브리지를 설치합니다.
+- `content.js`: classic content script로 transcript 가상화 런타임을 실행합니다.
+- `worker.js`: MV3 module service worker로 popup/content 메시지를 처리합니다.
 
 개발 중 자동 재빌드가 필요하면 다음 명령을 별도 터미널에서 실행합니다.
 
@@ -70,7 +77,11 @@ pnpm run watch
 
 팝업에서 On/Off를 바꾸면 서비스 워커가 현재 탭을 새로고침하므로, 토글 이후에는 페이지가 다시 로드되는 것이 정상입니다.
 
-## 6. 자주 겪는 문제
+## 6. 자동 검증 방식
+
+`pnpm run test:integration`은 Playwright가 Chromium persistent context에 `dist/`를 unpacked extension으로 직접 로드하는 방식으로 실행합니다. 즉, 테스트도 수동 로드 절차와 같은 확장 설정 환경을 사용하며, `content.js`를 별도 HTML에 module script로 주입하지 않습니다.
+
+## 7. 자주 겪는 문제
 
 ### 확장이 로드되지 않음
 

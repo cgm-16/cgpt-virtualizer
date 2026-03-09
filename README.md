@@ -23,7 +23,7 @@
 
 ### Content script
 
-- 진입점: `src/content.ts`
+- 진입점: `src/content.ts`, `src/content-page.ts`
 - 세부 모듈:
   - `startup.ts`: 현재 탭 활성화 여부를 확인하고 콘텐츠 런타임을 시작합니다.
   - `bootstrap.ts`: selector 해석, transcript 스캔, 세션 상태 초기화, observer 연결을 담당합니다.
@@ -31,7 +31,8 @@
   - `resize.ts`, `anchor.ts`: mounted bubble 높이 변경과 읽기 위치 보정을 처리합니다.
   - `append.ts`, `bottom-follow.ts`: tail append 배치와 near-bottom follow를 처리합니다.
   - `streaming.ts`, `placeholder.ts`: streaming 중 mount/unmount 일시 중단과 안내 placeholder를 처리합니다.
-  - `rebuild.ts`, `failure.ts`, `navigation.ts`: dirty rebuild, mid-session selector failure, SPA 네비게이션 리셋을 담당합니다.
+  - `rebuild.ts`, `failure.ts`, `navigation.ts`: dirty rebuild, mid-session selector failure, isolated world 런타임과 SPA 네비게이션 리셋을 담당합니다.
+  - `navigation-bridge.ts`: MAIN world에서 `pushState` / `replaceState` / `popstate`를 감지해 isolated world 런타임으로 전달합니다.
 
 ### Shared contracts
 
@@ -56,6 +57,7 @@
 │   ├── background/           # popup/content 메시지를 처리하는 worker 로직
 │   ├── content/              # transcript 가상화 런타임
 │   ├── shared/               # 메시지 계약, 상수, 경로 파서, 타입
+│   ├── content-page.ts       # MAIN world 네비게이션 브리지 진입점
 │   ├── popup.ts              # popup 진입점
 │   ├── popup-view.ts         # popup view model
 │   ├── content.ts            # content script 진입점
@@ -79,9 +81,10 @@ pnpm run test:unit
 pnpm run test:integration
 ```
 
-- `pnpm run build`: `dist/`에 `manifest.json`, `content.js`, `popup.html`, `popup.js`, `worker.js`를 생성합니다.
+- `pnpm run build`: `scripts/build.mjs`가 런타임별로 분리 빌드를 수행해 `dist/`에 `manifest.json`, `content-page.js`, `content.js`, `popup.html`, `popup.js`, `worker.js`를 생성합니다.
 - `pnpm run watch`: 개발 중 `dist/`를 계속 다시 빌드합니다.
 - `pnpm test`: unit + integration 테스트를 순서대로 실행합니다.
+- `pnpm run test:integration`: Playwright가 Chromium persistent context에 `dist/`를 unpacked extension으로 로드하고 실제 확장 런타임에서 popup, worker, content script를 함께 검증합니다.
 
 ## 문서
 
