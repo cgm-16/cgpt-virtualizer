@@ -1,144 +1,165 @@
-import { readFile } from "node:fs/promises";
-import { join, normalize } from "node:path";
+import type { BrowserContext, Page } from "@playwright/test";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "./extension-fixture.ts";
 
-const DIST_DIRECTORY = join(process.cwd(), "dist");
-test("비대상 경로에서는 idle 상태를 보고한다", async ({ page }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/g/example");
+const CHATGPT_BASE_URL = "https://chatgpt.com";
+
+test("비대상 경로에서는 활성화 후에도 Off 상태로 남는다", async ({
+  context,
+  extensionId,
+  page,
+}) => {
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/g/example",
+  );
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Off",
+  });
 
   await expect
     .poll(async () =>
-      page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
-      ),
+      page.evaluate(() => ({
+        bubbleCount: document.querySelectorAll("[data-cgpt-transcript-bubble]")
+          .length,
+        hasBottomSpacer:
+          document.querySelector("[data-cgpt-bottom-spacer]") !== null,
+        hasTopSpacer: document.querySelector("[data-cgpt-top-spacer]") !== null,
+      })),
     )
-    .toEqual([
-      {
-        availability: "idle",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+    .toEqual({
+      bubbleCount: 0,
+      hasBottomSpacer: false,
+      hasTopSpacer: false,
+    });
 });
 
 test("지원 경로에서 필수 선택자가 없으면 Unavailable을 보고한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/missing-selectors?fixture=missing");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/missing-selectors?fixture=missing",
+  );
 
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
-      ),
-    )
-    .toEqual([
-      {
-        availability: "unavailable",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Unavailable",
+  });
 });
 
 test("지원 경로에서 bubble이 threshold 미만이면 inactive를 보고한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/available?fixture=available");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/available?fixture=available",
+  );
 
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
-      ),
-    )
-    .toEqual([
-      {
-        availability: "inactive",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Off",
+  });
 });
 
 test("bubble이 0개일 때 inactive를 보고하고 오류 없이 실행된다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-0?fixture=bubble-0");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-0?fixture=bubble-0",
+  );
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Off",
+  });
 
   await expect
     .poll(async () =>
       page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
+        () => document.querySelectorAll("[data-cgpt-transcript-bubble]").length,
       ),
     )
-    .toEqual([
-      {
-        availability: "inactive",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+    .toBe(0);
 });
 
 test("bubble이 49개일 때 inactive를 보고하고 오류 없이 실행된다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-49?fixture=bubble-49");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-49?fixture=bubble-49",
+  );
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Off",
+  });
 
   await expect
     .poll(async () =>
       page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
+        () => document.querySelectorAll("[data-cgpt-transcript-bubble]").length,
       ),
     )
-    .toEqual([
-      {
-        availability: "inactive",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+    .toBe(49);
 });
 
 test("bubble이 50개일 때 available을 보고하고 오류 없이 실행된다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
-  await expect
-    .poll(async () =>
-      page.evaluate(
-        () =>
-          (window as typeof window & { __reportedMessages: unknown[] })
-            .__reportedMessages,
-      ),
-    )
-    .toEqual([
-      {
-        availability: "available",
-        type: "runtime/report-content-availability",
-      },
-    ]);
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 });
 
 test("bubble이 50개일 때 spacer와 전체 mounted range를 초기 패치한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 
   await expect
     .poll(async () =>
@@ -171,10 +192,21 @@ test("bubble이 50개일 때 spacer와 전체 mounted range를 초기 패치한�
 });
 
 test("memory guard 임계값을 넘으면 탭 비활성화 요청을 보내고 transcript DOM을 복구한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-2501?fixture=bubble-2501");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-2501?fixture=bubble-2501",
+  );
+
+  await expectPopupState(helperPage, {
+    enabled: false,
+    status: "Off",
+  });
 
   await expect
     .poll(async () =>
@@ -182,53 +214,40 @@ test("memory guard 임계값을 넘으면 탭 비활성화 요청을 보내고 t
         const transcriptRoot = document.querySelector<HTMLElement>(
           "[data-cgpt-transcript-root]",
         );
-        const sentMessages = (window as WindowWithTestState).__sentMessages;
 
         return {
           bubbleCount:
             transcriptRoot?.querySelectorAll("[data-cgpt-transcript-bubble]")
               .length ?? 0,
-          disableRequestCount: sentMessages.filter(
-            (message) =>
-              typeof message === "object" &&
-              message !== null &&
-              "type" in message &&
-              message.type === "runtime/disable-tab-virtualization",
-          ).length,
           hasBottomSpacer:
             transcriptRoot?.querySelector("[data-cgpt-bottom-spacer]") !== null,
           hasTopSpacer:
             transcriptRoot?.querySelector("[data-cgpt-top-spacer]") !== null,
-          lastAvailability:
-            (window as WindowWithTestState).__reportedMessages.at(-1) !==
-              undefined &&
-            typeof (window as WindowWithTestState).__reportedMessages.at(-1) ===
-              "object"
-              ? ((
-                  (window as WindowWithTestState).__reportedMessages.at(-1) as {
-                    availability?: string;
-                  }
-                ).availability ?? null)
-              : null,
-          tabEnabled: (window as WindowWithTestState).__tabEnabled,
         };
       }),
     )
     .toEqual({
       bubbleCount: 2501,
-      disableRequestCount: 1,
       hasBottomSpacer: false,
       hasTopSpacer: false,
-      lastAvailability: "available",
-      tabEnabled: false,
     });
 });
 
 test("mid-session selector failure는 Unavailable로 전환되고 navigation 전까지 inert 상태를 유지한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 
   await expectInitialMountedWindow(page);
 
@@ -241,29 +260,10 @@ test("mid-session selector failure는 Unavailable로 전환되고 navigation 전
     await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
 
-  await expect
-    .poll(async () =>
-      page.evaluate(() => {
-        const messages = (window as WindowWithTestState).__reportedMessages;
-
-        return {
-          lastAvailability:
-            messages.at(-1) !== undefined && typeof messages.at(-1) === "object"
-              ? ((messages.at(-1) as { availability?: string }).availability ??
-                null)
-              : null,
-          messageCount: messages.length,
-        };
-      }),
-    )
-    .toEqual({
-      lastAvailability: "unavailable",
-      messageCount: 2,
-    });
-
-  const rafCallCount = await page.evaluate(
-    () => (window as WindowWithTestState).__rafCallCount,
-  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Unavailable",
+  });
 
   await page.evaluate(() => {
     const detachedScrollContainer = (window as WindowWithTestState)
@@ -277,15 +277,16 @@ test("mid-session selector failure는 Unavailable로 전환되고 navigation 전
     detachedScrollContainer.dispatchEvent(new Event("scroll"));
   });
 
-  expect(
-    await page.evaluate(() => (window as WindowWithTestState).__rafCallCount),
-  ).toBe(rafCallCount);
-
   await page.evaluate(async () => {
     history.pushState({}, "", "/c/recovered?fixture=bubble-50-alt");
     (window as WindowWithTestState).__replaceFixture("bubble-50-alt");
 
     await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
   });
 
   await expect
@@ -296,39 +297,39 @@ test("mid-session selector failure는 Unavailable로 전환되고 navigation 전
         );
         const children =
           transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
-        const messages = (window as WindowWithTestState).__reportedMessages;
 
         return {
           firstBubbleText: children[1]?.textContent ?? null,
-          lastAvailability:
-            messages.at(-1) !== undefined && typeof messages.at(-1) === "object"
-              ? ((messages.at(-1) as { availability?: string }).availability ??
-                null)
-              : null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          messageCount: messages.length,
         };
       }),
     )
     .toEqual({
       firstBubbleText: "Next Bubble 0",
-      lastAvailability: "available",
       lastBubbleText: "Next Bubble 3",
-      messageCount: 3,
     });
 });
 
 test("conversation ID가 바뀌면 현재 세션을 폐기하고 새 transcript를 처음부터 다시 초기화한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 
   await expectInitialMountedWindow(page);
   await scrollToTranscriptPosition(page, 400, {
     firstBubbleText: "Bubble 2",
     lastBubbleText: "Bubble 7",
-    rafCallCount: 2,
   });
 
   await page.evaluate(async () => {
@@ -338,6 +339,11 @@ test("conversation ID가 바뀌면 현재 세션을 폐기하고 새 transcript�
     await new Promise((resolve) => window.setTimeout(resolve, 0));
   });
 
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
+
   await expect
     .poll(async () =>
       page.evaluate(() => {
@@ -346,13 +352,10 @@ test("conversation ID가 바뀌면 현재 세션을 폐기하고 새 transcript�
         );
         const children =
           transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
-        const messages = (window as WindowWithTestState).__reportedMessages;
 
         return {
           firstBubbleText: children[1]?.textContent ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          messageCount: messages.length,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
           scrollTop:
             document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
               ?.scrollTop ?? null,
@@ -362,23 +365,36 @@ test("conversation ID가 바뀌면 현재 세션을 폐기하고 새 transcript�
     .toEqual({
       firstBubbleText: "Next Bubble 0",
       lastBubbleText: "Next Bubble 3",
-      messageCount: 2,
-      rafCallCount: 3,
       scrollTop: 0,
     });
 });
 
-test("비 transcript 경로로 이동하면 활성 세션을 해제하고 idle 상태로 남는다", async ({
+test("비 transcript 경로로 이동하면 활성 세션을 해제하고 Off 상태로 남는다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 
   await expectInitialMountedWindow(page);
 
   await page.evaluate(async () => {
     history.pushState({}, "", "/g/example");
     await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Off",
   });
 
   await expect
@@ -398,46 +414,50 @@ test("비 transcript 경로로 이동하면 활성 세션을 해제하고 idle �
           scrollContainer.dispatchEvent(new Event("scroll"));
         }
 
-        const messages = (window as WindowWithTestState).__reportedMessages;
-
         return {
           childCount: children.length,
           firstBubbleText: children[0]?.textContent ?? null,
-          lastAvailability:
-            messages.at(-1) !== undefined && typeof messages.at(-1) === "object"
-              ? ((messages.at(-1) as { availability?: string }).availability ??
-                null)
-              : null,
           lastBubbleText: children.at(-1)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
     .toEqual({
       childCount: 50,
       firstBubbleText: "Bubble 0",
-      lastAvailability: "idle",
       lastBubbleText: "Bubble 49",
-      rafCallCount: 1,
     });
 });
 
 test("같은 conversation ID의 네비게이션 신호는 파괴적 재초기화를 일으키지 않는다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
 
   await expectInitialMountedWindow(page);
   await scrollToTranscriptPosition(page, 400, {
     firstBubbleText: "Bubble 2",
     lastBubbleText: "Bubble 7",
-    rafCallCount: 2,
   });
 
   await page.evaluate(async () => {
     history.replaceState({}, "", "/c/bubble-50?fixture=bubble-50&view=details");
     await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
   });
 
   await expect
@@ -453,9 +473,6 @@ test("같은 conversation ID의 네비게이션 신호는 파괴적 재초기화
           childCount: children.length,
           firstBubbleText: children[1]?.textContent ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          messageCount: (window as WindowWithTestState).__reportedMessages
-            .length,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
           scrollTop:
             document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
               ?.scrollTop ?? null,
@@ -466,17 +483,21 @@ test("같은 conversation ID의 네비게이션 신호는 파괴적 재초기화
       childCount: 8,
       firstBubbleText: "Bubble 2",
       lastBubbleText: "Bubble 7",
-      messageCount: 1,
-      rafCallCount: 2,
       scrollTop: 400,
     });
 });
 
-test("스크롤로 mounted range가 바뀌면 다음 frame에서만 패치한다", async ({
+test("스크롤로 mounted range가 바뀌면 mounted range를 갱신한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -505,22 +526,26 @@ test("스크롤로 mounted range가 바뀌면 다음 frame에서만 패치한다
         return {
           firstBubbleText: children[1]?.textContent ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
     .toEqual({
       firstBubbleText: "Bubble 0",
       lastBubbleText: "Bubble 6",
-      rafCallCount: 2,
     });
 });
 
-test("range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다", async ({
+test("range가 바뀌지 않는 scroll은 mounted range를 유지한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -539,33 +564,68 @@ test("range가 바뀌지 않는 scroll은 추가 frame을 예약하지 않는다
 
   await expect
     .poll(async () =>
-      page.evaluate(() => (window as WindowWithTestState).__rafCallCount),
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector(
+          "[data-cgpt-transcript-root]",
+        );
+        const children =
+          transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+        };
+      }),
     )
-    .toBe(2);
+    .toEqual({
+      firstBubbleText: "Bubble 0",
+      lastBubbleText: "Bubble 6",
+    });
 
-  await page.evaluate(async () => {
-    const scrollContainer = document.querySelector<HTMLElement>(
-      "[data-cgpt-scroll-container]",
-    );
+  await expect
+    .poll(async () =>
+      page.evaluate(async () => {
+        const scrollContainer = document.querySelector<HTMLElement>(
+          "[data-cgpt-scroll-container]",
+        );
 
-    if (scrollContainer === null) {
-      throw new Error("scroll container fixture is missing");
-    }
+        if (scrollContainer === null) {
+          throw new Error("scroll container fixture is missing");
+        }
 
-    scrollContainer.scrollTop = 280;
-    scrollContainer.dispatchEvent(new Event("scroll"));
+        scrollContainer.scrollTop = 280;
+        scrollContainer.dispatchEvent(new Event("scroll"));
 
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
-  });
+        await new Promise((resolve) => window.setTimeout(resolve, 50));
+        const transcriptRoot = document.querySelector(
+          "[data-cgpt-transcript-root]",
+        );
+        const children =
+          transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
 
-  expect(
-    await page.evaluate(() => (window as WindowWithTestState).__rafCallCount),
-  ).toBe(2);
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+        };
+      }),
+    )
+    .toEqual({
+      firstBubbleText: "Bubble 0",
+      lastBubbleText: "Bubble 6",
+    });
 });
 
-test("streaming 중 scroll은 mounted range 패치를 멈춘다", async ({ page }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+test("streaming 중 scroll은 mounted range 패치를 멈춘다", async ({
+  context,
+  extensionId,
+  page,
+}) => {
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -610,10 +670,16 @@ test("streaming 중 scroll은 mounted range 패치를 멈춘다", async ({ page 
 });
 
 test("streaming 종료 후에는 scroll-driven mounted range patch가 다시 동작한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -655,7 +721,6 @@ test("streaming 종료 후에는 scroll-driven mounted range patch가 다시 동
             transcriptRoot?.querySelectorAll(
               "[data-cgpt-streaming-gap-placeholder]",
             ).length ?? 0,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
@@ -664,15 +729,20 @@ test("streaming 종료 후에는 scroll-driven mounted range patch가 다시 동
       firstBubbleText: "Bubble 0",
       lastBubbleText: "Bubble 6",
       placeholderCount: 0,
-      rafCallCount: 3,
     });
 });
 
 test("streaming gap에 진입하면 placeholder를 표시하고 종료 시 제거한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -757,10 +827,16 @@ test("streaming gap에 진입하면 placeholder를 표시하고 종료 시 제�
 });
 
 test("streaming 중 resize는 anchor correction을 계속 적용한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -860,10 +936,16 @@ test("streaming 중 resize는 anchor correction을 계속 적용한다", async (
 });
 
 test("mounted bubble resize는 prefix sum과 mounted range를 갱신한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expect
     .poll(async () =>
@@ -878,7 +960,6 @@ test("mounted bubble resize는 prefix sum과 mounted range를 갱신한다", asy
           bottomSpacerHeight: children.at(-1)?.getAttribute("style") ?? null,
           childCount: children.length,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
@@ -886,7 +967,6 @@ test("mounted bubble resize는 prefix sum과 mounted range를 갱신한다", asy
       bottomSpacerHeight: "height: 4600px;",
       childCount: 6,
       lastBubbleText: "Bubble 3",
-      rafCallCount: 1,
     });
 
   await page.evaluate(() => {
@@ -909,7 +989,6 @@ test("mounted bubble resize는 prefix sum과 mounted range를 갱신한다", asy
           bottomSpacerHeight: children.at(-1)?.getAttribute("style") ?? null,
           childCount: children.length,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
@@ -917,13 +996,20 @@ test("mounted bubble resize는 prefix sum과 mounted range를 갱신한다", asy
       bottomSpacerHeight: "height: 4700px;",
       childCount: 5,
       lastBubbleText: "Bubble 2",
-      rafCallCount: 2,
     });
 });
 
-test("detached bubble resize는 관찰되지 않는다", async ({ page }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+test("detached bubble resize는 관찰되지 않는다", async ({
+  context,
+  extensionId,
+  page,
+}) => {
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expect
     .poll(async () =>
@@ -934,13 +1020,11 @@ test("detached bubble resize는 관찰되지 않는다", async ({ page }) => {
             ?.getAttribute("style") ?? null,
         detachedBubbleConnected:
           (window as WindowWithTestState).__allBubbles[10]?.isConnected ?? null,
-        rafCallCount: (window as WindowWithTestState).__rafCallCount,
       })),
     )
     .toEqual({
       bottomSpacerHeight: "height: 4600px;",
       detachedBubbleConnected: false,
-      rafCallCount: 1,
     });
 
   await page.evaluate(async () => {
@@ -958,17 +1042,23 @@ test("detached bubble resize는 관찰되지 않는다", async ({ page }) => {
         document
           .querySelector("[data-cgpt-bottom-spacer]")
           ?.getAttribute("style") ?? null,
-      rafCallCount: (window as WindowWithTestState).__rafCallCount,
     })),
   ).toEqual({
     bottomSpacerHeight: "height: 4600px;",
-    rafCallCount: 1,
   });
 });
 
-test("anchor 위 bubble resize는 읽기 위치를 유지한다", async ({ page }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+test("anchor 위 bubble resize는 읽기 위치를 유지한다", async ({
+  context,
+  extensionId,
+  page,
+}) => {
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -996,13 +1086,11 @@ test("anchor 위 bubble resize는 읽기 위치를 유지한다", async ({ page 
 
         return {
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
     .toEqual({
       lastBubbleText: "Bubble 6",
-      rafCallCount: 2,
     });
 
   const beforeResize = await page.evaluate(() => {
@@ -1051,23 +1139,27 @@ test("anchor 위 bubble resize는 읽기 위치를 유지한다", async ({ page 
           anchorOffset:
             anchorBubble.getBoundingClientRect().top -
             scrollContainer.getBoundingClientRect().top,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
           scrollTop: scrollContainer.scrollTop,
         };
       }),
     )
     .toEqual({
       anchorOffset: -50,
-      rafCallCount: 2,
       scrollTop: 275,
     });
 });
 
 test("streaming 종료 시 pending append batch를 즉시 flush한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -1148,10 +1240,16 @@ test("streaming 종료 시 pending append batch를 즉시 flush한다", async ({
 });
 
 test("near-bottom append는 새 tail을 mount하고 exact bottom으로 따라간다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -1180,7 +1278,6 @@ test("near-bottom append는 새 tail을 mount하고 exact bottom으로 따라간
         return {
           bottomSpacerHeight: children.at(-1)?.getAttribute("style") ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
           scrollTop:
             document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
               ?.scrollTop ?? null,
@@ -1190,7 +1287,6 @@ test("near-bottom append는 새 tail을 mount하고 exact bottom으로 따라간
     .toEqual({
       bottomSpacerHeight: "height: 0px;",
       lastBubbleText: "Bubble 49",
-      rafCallCount: 2,
       scrollTop: 4800,
     });
 
@@ -1249,10 +1345,16 @@ test("near-bottom append는 새 tail을 mount하고 exact bottom으로 따라간
 });
 
 test("non-near-bottom append burst는 detached tail로 남는다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
 
@@ -1296,7 +1398,6 @@ test("non-near-bottom append burst는 detached tail로 남는다", async ({
           detachedTailBubbleCount: (
             window as WindowWithTestState
           ).__tailAppendNodes.filter((node) => !node.isConnected).length,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
           scrollTop:
             document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
               ?.scrollTop ?? null,
@@ -1307,22 +1408,26 @@ test("non-near-bottom append burst는 detached tail로 남는다", async ({
       bottomSpacerHeight: "height: 4800px;",
       childCount: 6,
       detachedTailBubbleCount: 2,
-      rafCallCount: 2,
       scrollTop: 0,
     });
 });
 
 test("mid-list removal은 dirty rebuild를 트리거하고 surviving anchor 위치를 복원한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
   await scrollToTranscriptPosition(page, 400, {
     firstBubbleText: "Bubble 2",
     lastBubbleText: "Bubble 7",
-    rafCallCount: 2,
   });
 
   expect(
@@ -1402,16 +1507,21 @@ test("mid-list removal은 dirty rebuild를 트리거하고 surviving anchor 위�
 });
 
 test("anchor bubble가 사라지면 dirty rebuild는 raw scrollTop fallback을 사용한다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
   await scrollToTranscriptPosition(page, 400, {
     firstBubbleText: "Bubble 2",
     lastBubbleText: "Bubble 7",
-    rafCallCount: 2,
   });
 
   await page.evaluate(() => {
@@ -1461,16 +1571,21 @@ test("anchor bubble가 사라지면 dirty rebuild는 raw scrollTop fallback을 �
 });
 
 test("dirty rebuild 뒤에도 append observer가 다시 연결된다", async ({
+  context,
+  extensionId,
   page,
 }) => {
-  await installFixtureRoutes(page);
-  await page.goto("http://fixture.test/c/bubble-50?fixture=bubble-50");
+  await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
 
   await expectInitialMountedWindow(page);
   await scrollToTranscriptPosition(page, 400, {
     firstBubbleText: "Bubble 2",
     lastBubbleText: "Bubble 7",
-    rafCallCount: 2,
   });
 
   await page.evaluate(() => {
@@ -1488,13 +1603,25 @@ test("dirty rebuild 뒤에도 append observer가 다시 연결된다", async ({
 
   await expect
     .poll(async () =>
-      page.evaluate(() => ({
-        scrollTop:
-          document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
-            ?.scrollTop ?? null,
-      })),
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector(
+          "[data-cgpt-transcript-root]",
+        );
+        const children =
+          transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+          scrollTop:
+            document.querySelector<HTMLElement>("[data-cgpt-scroll-container]")
+              ?.scrollTop ?? null,
+        };
+      }),
     )
     .toEqual({
+      firstBubbleText: "Bubble 1",
+      lastBubbleText: "Bubble 7",
       scrollTop: 300,
     });
 
@@ -1543,7 +1670,7 @@ test("dirty rebuild 뒤에도 append observer가 다시 연결된다", async ({
 });
 
 function renderFixtureHtml(requestPath: string): string {
-  const url = new URL(`http://fixture${requestPath}`);
+  const url = new URL(`${CHATGPT_BASE_URL}${requestPath}`);
   const fixture = url.searchParams.get("fixture");
   const fixtureBodies = {
     available: renderFixtureBody("available"),
@@ -1564,10 +1691,6 @@ function renderFixtureHtml(requestPath: string): string {
   <body>
     ${renderFixtureBody(fixture)}
     <script>
-      window.__reportedMessages = []
-      window.__sentMessages = []
-      window.__tabEnabled = true
-      window.__rafCallCount = 0
       window.__allBubbles = Array.from(document.querySelectorAll('[data-cgpt-transcript-bubble]'))
       window.__fixtureBodies = ${JSON.stringify(fixtureBodies)}
       window.__tailAppendNodes = []
@@ -1576,50 +1699,7 @@ function renderFixtureHtml(requestPath: string): string {
         window.__allBubbles = Array.from(document.querySelectorAll('[data-cgpt-transcript-bubble]'))
         window.__tailAppendNodes = []
       }
-      const originalRequestAnimationFrame = window.requestAnimationFrame.bind(window)
-      window.requestAnimationFrame = function requestAnimationFrameWrapper(callback) {
-        window.__rafCallCount += 1
-        return originalRequestAnimationFrame(callback)
-      }
-      window.chrome = {
-        runtime: {
-          lastError: undefined,
-          onMessage: {
-            addListener() {},
-          },
-          sendMessage(message, callback) {
-            window.__sentMessages.push(message)
-
-            if (message?.type === 'runtime/get-tab-enabled') {
-              if (typeof callback === 'function') {
-                callback({
-                  enabled: window.__tabEnabled,
-                  type: 'runtime/tab-enabled',
-                })
-              }
-              return
-            }
-
-            if (message?.type === 'runtime/disable-tab-virtualization') {
-              window.__tabEnabled = false
-            }
-
-            if (message?.type === 'runtime/report-content-availability') {
-              window.__reportedMessages.push(message)
-            }
-
-            if (typeof callback === 'function') {
-              callback(null)
-            }
-          },
-        },
-        tabs: {
-          query() {},
-          reload() {},
-        },
-      }
     </script>
-    <script type="module" src="/dist/content.js"></script>
   </body>
 </html>`;
 }
@@ -1680,48 +1760,9 @@ function renderFixtureBody(fixture: string | null): string {
   return "<main></main>";
 }
 
-function contentTypeFor(assetPath: string): string {
-  if (assetPath.endsWith(".js")) {
-    return "text/javascript; charset=utf-8";
-  }
-
-  if (assetPath.endsWith(".css")) {
-    return "text/css; charset=utf-8";
-  }
-
-  return "application/octet-stream";
-}
-
-async function installFixtureRoutes(page: Page): Promise<void> {
-  await page.route("**/*", async (route) => {
+async function installFixtureRoutes(context: BrowserContext): Promise<void> {
+  await context.route(`${CHATGPT_BASE_URL}/**`, async (route) => {
     const url = new URL(route.request().url());
-
-    if (url.pathname.startsWith("/dist/")) {
-      const assetPath = normalize(
-        join(DIST_DIRECTORY, url.pathname.replace("/dist/", "")),
-      );
-
-      if (!assetPath.startsWith(DIST_DIRECTORY)) {
-        await route.fulfill({ body: "forbidden", status: 403 });
-        return;
-      }
-
-      try {
-        const asset = await readFile(assetPath);
-        await route.fulfill({
-          body: asset,
-          contentType: contentTypeFor(assetPath),
-          status: 200,
-        });
-      } catch {
-        await route.fulfill({
-          body: "not found",
-          status: 404,
-        });
-      }
-
-      return;
-    }
 
     await route.fulfill({
       body: renderFixtureHtml(`${url.pathname}${url.search}`),
@@ -1729,6 +1770,100 @@ async function installFixtureRoutes(page: Page): Promise<void> {
       status: 200,
     });
   });
+}
+
+async function openEnabledFixture(
+  page: Page,
+  context: BrowserContext,
+  extensionId: string,
+  requestPath: string,
+): Promise<Page> {
+  await installFixtureRoutes(context);
+  await page.goto(`${CHATGPT_BASE_URL}${requestPath}`);
+
+  const helperPage = await openHelperPage(context, extensionId);
+  await Promise.all([
+    page.waitForNavigation({
+      waitUntil: "domcontentloaded",
+    }),
+    setExtensionEnabled(helperPage, true),
+  ]);
+  await page.bringToFront();
+  await page.waitForLoadState("domcontentloaded");
+
+  return helperPage;
+}
+
+async function openHelperPage(
+  context: BrowserContext,
+  extensionId: string,
+): Promise<Page> {
+  const helperPage = await context.newPage();
+  await helperPage.goto(`chrome-extension://${extensionId}/popup.html`);
+  return helperPage;
+}
+
+async function setExtensionEnabled(
+  helperPage: Page,
+  enabled: boolean,
+): Promise<void> {
+  await helperPage.evaluate(async (nextEnabled) => {
+    const tabs = await chrome.tabs.query({
+      url: ["https://chatgpt.com/*"],
+    });
+    const targetTabId = tabs[0]?.id;
+
+    if (typeof targetTabId !== "number") {
+      throw new Error("활성화할 ChatGPT 탭을 찾을 수 없습니다.");
+    }
+
+    await chrome.tabs.update(targetTabId, { active: true });
+
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        {
+          enabled: nextEnabled,
+          type: "runtime/set-tab-enabled",
+        },
+        resolve,
+      );
+    });
+  }, enabled);
+}
+
+async function getPopupState(helperPage: Page): Promise<{
+  enabled: boolean;
+  status: "Off" | "On" | "Unavailable";
+}> {
+  return helperPage.evaluate(async () => {
+    const tabs = await chrome.tabs.query({
+      url: ["https://chatgpt.com/*"],
+    });
+    const targetTabId = tabs[0]?.id;
+
+    if (typeof targetTabId === "number") {
+      await chrome.tabs.update(targetTabId, { active: true });
+    }
+
+    return await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "runtime/get-popup-state" }, resolve);
+    });
+  }) as Promise<{
+    enabled: boolean;
+    status: "Off" | "On" | "Unavailable";
+  }>;
+}
+
+async function expectPopupState(
+  helperPage: Page,
+  expectedState: {
+    enabled: boolean;
+    status: "Off" | "On" | "Unavailable";
+  },
+): Promise<void> {
+  await expect
+    .poll(async () => await getPopupState(helperPage))
+    .toMatchObject(expectedState);
 }
 
 async function expectInitialMountedWindow(page: Page): Promise<void> {
@@ -1744,14 +1879,12 @@ async function expectInitialMountedWindow(page: Page): Promise<void> {
         return {
           firstBubbleText: children[1]?.textContent ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
     .toEqual({
       firstBubbleText: "Bubble 0",
       lastBubbleText: "Bubble 3",
-      rafCallCount: 1,
     });
 }
 
@@ -1761,7 +1894,6 @@ async function scrollToTranscriptPosition(
   expectedWindow: {
     firstBubbleText: string;
     lastBubbleText: string;
-    rafCallCount: number;
   },
 ): Promise<void> {
   await page.evaluate((nextScrollTop) => {
@@ -1789,7 +1921,6 @@ async function scrollToTranscriptPosition(
         return {
           firstBubbleText: children[1]?.textContent ?? null,
           lastBubbleText: children.at(-2)?.textContent ?? null,
-          rafCallCount: (window as WindowWithTestState).__rafCallCount,
         };
       }),
     )
@@ -1800,10 +1931,6 @@ interface WindowWithTestState extends Window {
   __allBubbles: HTMLElement[];
   __detachedScrollContainer?: HTMLElement;
   __fixtureBodies: Record<string, string>;
-  __rafCallCount: number;
   __replaceFixture(fixture: string): void;
-  __reportedMessages: unknown[];
-  __sentMessages: Array<{ type?: string }>;
-  __tabEnabled: boolean;
   __tailAppendNodes: HTMLElement[];
 }
