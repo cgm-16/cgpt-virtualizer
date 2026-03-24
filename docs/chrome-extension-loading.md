@@ -81,6 +81,19 @@ pnpm run watch
 
 `pnpm run test:integration`은 Playwright가 Chromium persistent context에 `dist/`를 unpacked extension으로 직접 로드하는 방식으로 실행합니다. 즉, 테스트도 수동 로드 절차와 같은 확장 설정 환경을 사용하며, `content.js`를 별도 HTML에 module script로 주입하지 않습니다.
 
+추가로 `tests/integration/visual-smoke.spec.ts`는 다음 두 화면을 골든 스크린샷으로 검증합니다.
+
+- popup에서 확장이 `On` 상태로 렌더링된 화면
+- transcript fixture에서 초기 mounted window가 적용된 content-script 화면
+
+시각 기준선을 의도적으로 갱신해야 하면 아래 명령을 사용합니다.
+
+```bash
+pnpm run test:integration -- --update-snapshots tests/integration/visual-smoke.spec.ts
+```
+
+GitHub Actions에서는 `playwright-report`와 함께 `test-results/`도 artifact로 업로드하므로, 시각 회귀가 실패하면 expected/actual/diff 이미지를 내려받아 비교할 수 있습니다.
+
 ## 7. 자주 겪는 문제
 
 ### 확장이 로드되지 않음
