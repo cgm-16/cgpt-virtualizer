@@ -2,7 +2,11 @@ import { createReportContentAvailabilityMessage } from "../shared/messages.ts";
 import type { MutationObserverLike } from "./append.ts";
 import type { ResolvedContentSelectors } from "./selectors.ts";
 
+// 단순 속성 선택자만 처리한다 (예: [attr], [attr=val], [attr^=val]).
+// 따옴표 안에 ']'가 포함된 값은 지원하지 않는다.
 const ATTRIBUTE_SELECTOR_PATTERN = /\[\s*([^\s~|^$*=\]]+)/g;
+// 속성 세그먼트를 제거한 뒤 '.', '#' 존재 여부로 class/id 의존성을 판별한다.
+// 따옴표 안에 ']'가 포함된 속성 값은 지원하지 않는다.
 const ATTRIBUTE_SEGMENT_PATTERN = /\[[^\]]*\]/g;
 
 type ReportAvailability = (
