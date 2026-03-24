@@ -16,6 +16,7 @@ import {
   runDirtyRebuild,
 } from "./rebuild.ts";
 import {
+  collectObservedSelectorAttributes,
   createSelectorFailureObserverManager,
   handleSelectorStartupFailure,
   reportUnavailableStatus,
@@ -36,7 +37,7 @@ import {
   applyPendingAnchorCorrection,
   initializeScrollVirtualization,
 } from "./scroll.ts";
-import { resolveSelectors } from "./selectors.ts";
+import { CONTENT_SELECTOR_REGISTRY, resolveSelectors } from "./selectors.ts";
 import {
   buildBubbleRecords,
   markAllRecordsMounted,
@@ -50,6 +51,11 @@ import {
   scanTranscript,
   type TranscriptScanResult,
 } from "./transcript-scan.ts";
+
+const SELECTOR_FAILURE_ATTRIBUTE_FILTER = collectObservedSelectorAttributes([
+  CONTENT_SELECTOR_REGISTRY.scrollContainer,
+  CONTENT_SELECTOR_REGISTRY.transcriptRoot,
+]);
 
 export interface ContentBootstrapDependencies {
   clearTimeout?(handle: number): void;
@@ -311,6 +317,7 @@ export function bootstrapContentScript(
         },
       );
       selectorFailureObserverManager = createSelectorFailureObserverManager({
+        attributeFilter: SELECTOR_FAILURE_ATTRIBUTE_FILTER,
         createMutationObserver:
           dependencies.createMutationObserver ??
           ((callback) => new MutationObserver(callback)),

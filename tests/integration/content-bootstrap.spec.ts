@@ -313,6 +313,89 @@ test("mid-session selector failure는 Unavailable로 전환되고 navigation 전
     });
 });
 
+test("mid-session selector attribute drift도 Unavailable로 전환되고 navigation 전까지 inert 상태를 유지한다", async ({
+  context,
+  extensionId,
+  page,
+}) => {
+  const helperPage = await openEnabledFixture(
+    page,
+    context,
+    extensionId,
+    "/c/bubble-50?fixture=bubble-50",
+  );
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
+
+  await expectInitialMountedWindow(page);
+
+  await page.evaluate(async () => {
+    const scrollContainer = document.querySelector<HTMLElement>(
+      "[data-cgpt-scroll-container]",
+    );
+
+    if (scrollContainer === null) {
+      throw new Error("scroll container fixture is missing");
+    }
+
+    (window as WindowWithTestState).__detachedScrollContainer = scrollContainer;
+    scrollContainer.removeAttribute("data-cgpt-scroll-container");
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "Unavailable",
+  });
+
+  await page.evaluate(() => {
+    const detachedScrollContainer = (window as WindowWithTestState)
+      .__detachedScrollContainer;
+
+    if (detachedScrollContainer === undefined) {
+      throw new Error("detached scroll container fixture is missing");
+    }
+
+    detachedScrollContainer.scrollTop = 400;
+    detachedScrollContainer.dispatchEvent(new Event("scroll"));
+  });
+
+  await page.evaluate(async () => {
+    history.pushState({}, "", "/c/recovered?fixture=bubble-50-alt");
+    (window as WindowWithTestState).__replaceFixture("bubble-50-alt");
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+  });
+
+  await expectPopupState(helperPage, {
+    enabled: true,
+    status: "On",
+  });
+
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const transcriptRoot = document.querySelector(
+          "[data-cgpt-transcript-root]",
+        );
+        const children =
+          transcriptRoot === null ? [] : Array.from(transcriptRoot.children);
+
+        return {
+          firstBubbleText: children[1]?.textContent ?? null,
+          lastBubbleText: children.at(-2)?.textContent ?? null,
+        };
+      }),
+    )
+    .toEqual({
+      firstBubbleText: "Next Bubble 0",
+      lastBubbleText: "Next Bubble 3",
+    });
+});
+
 test("conversation ID가 바뀌면 현재 세션을 폐기하고 새 transcript를 처음부터 다시 초기화한다", async ({
   context,
   extensionId,
