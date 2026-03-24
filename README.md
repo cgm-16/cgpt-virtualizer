@@ -84,7 +84,8 @@ pnpm run test:integration
 - `pnpm run build`: `scripts/build.mjs`가 런타임별로 분리 빌드를 수행해 `dist/`에 `manifest.json`, `content-page.js`, `content.js`, `popup.html`, `popup.js`, `worker.js`를 생성합니다.
 - `pnpm run watch`: 개발 중 `dist/`를 계속 다시 빌드합니다.
 - `pnpm test`: unit + integration 테스트를 순서대로 실행합니다.
-- `pnpm run test:integration`: Playwright가 Chromium persistent context에 `dist/`를 unpacked extension으로 로드하고 실제 확장 런타임에서 popup, worker, content script를 함께 검증합니다.
+- `pnpm run test:integration`: Playwright가 Chromium persistent context에 `dist/`를 unpacked extension으로 로드하고 실제 확장 런타임에서 popup, worker, content script를 함께 검증합니다. `tests/integration/visual-smoke.spec.ts`는 popup On 상태와 transcript 초기 mounted window를 골든 스크린샷으로 비교합니다.
+- `pnpm run test:integration -- --update-snapshots tests/integration/visual-smoke.spec.ts`: 시각 기준선을 의도적으로 갱신합니다.
 
 ## 문서
 
