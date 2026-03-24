@@ -31,7 +31,7 @@ export async function openEnabledFixture(
   return helperPage;
 }
 
-export async function openHelperPage(
+async function openHelperPage(
   context: BrowserContext,
   extensionId: string,
 ): Promise<Page> {
@@ -40,7 +40,7 @@ export async function openHelperPage(
   return helperPage;
 }
 
-export async function setExtensionEnabled(
+async function setExtensionEnabled(
   helperPage: Page,
   enabled: boolean,
 ): Promise<void> {
@@ -68,7 +68,7 @@ export async function setExtensionEnabled(
   }, enabled);
 }
 
-export async function getPopupState(helperPage: Page): Promise<PopupState> {
+async function getPopupState(helperPage: Page): Promise<PopupState> {
   return helperPage.evaluate(async () => {
     const tabs = await chrome.tabs.query({
       url: ["https://chatgpt.com/*"],

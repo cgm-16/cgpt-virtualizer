@@ -5,8 +5,6 @@ import {
   openEnabledFixture,
 } from "./chatgpt-fixture.ts";
 
-test.describe.configure({ mode: "serial" });
-
 test("팝업 On 상태가 일관되게 렌더링된다", async ({
   context,
   extensionId,
@@ -50,12 +48,13 @@ test("transcript 초기 mounted window가 일관되게 렌더링된다", async (
     width: 1280,
   });
 
-  await openEnabledFixture(
+  const helperPage = await openEnabledFixture(
     page,
     context,
     extensionId,
     "/c/bubble-50?fixture=bubble-50",
   );
+  await helperPage.close();
 
   await expectInitialMountedWindow(page);
   await expect(page.locator("[data-cgpt-scroll-container]")).toHaveScreenshot(

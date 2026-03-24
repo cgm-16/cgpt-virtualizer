@@ -1,3 +1,9 @@
+/*
+ * 시각 smoke 테스트용 합성 스타일시트.
+ * 실제 확장 UI가 아니라 fixture HTML의 DOM 구조가 올바르게
+ * 마운트되었는지 검증하기 위한 결정론적 외관을 제공한다.
+ */
+
 :root {
   color-scheme: light;
 }
