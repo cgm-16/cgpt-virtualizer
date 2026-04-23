@@ -57,6 +57,8 @@ const SELECTOR_FAILURE_ATTRIBUTE_FILTER = collectObservedSelectorAttributes([
   CONTENT_SELECTOR_REGISTRY.transcriptRoot,
 ]);
 
+const STARTUP_DISCOVERY_TIMEOUT_MS = 10_000;
+
 export interface ContentBootstrapDependencies {
   clearTimeout?(handle: number): void;
   createMutationObserver?(callback: MutationCallback): MutationObserverLike;
@@ -90,33 +92,122 @@ export function bootstrapContentScript(
     selectors,
   );
 
-  if (baseAvailability === "unavailable") {
+  if (baseAvailability === "idle") {
+    dependencies.reportAvailability(
+      createReportContentAvailabilityMessage("idle"),
+    );
+
     return {
-      availability: handleSelectorStartupFailure(
-        dependencies.reportAvailability,
-      ),
+      availability: "idle",
       destroy() {},
       scanResult: null,
       sessionState: null,
     };
   }
 
+  // baseAvailability is "unavailable" or "available" from here on.
+  // In both cases we may enter the startup discovery phase if selectors are
+  // missing or the transcript has too few bubbles to activate.
+
   const scanResult = selectors !== null ? scanTranscript(selectors) : null;
-  const availability =
+  const availability: ContentAvailability =
     baseAvailability === "available" &&
     scanResult !== null &&
     !scanResult.activationEligible
       ? "inactive"
       : baseAvailability;
-  const sessionState =
-    availability === "available" && selectors !== null && scanResult !== null
-      ? createTranscriptSessionState(selectors.scrollContainer, scanResult)
-      : null;
-  let destroy = () => {};
 
-  if (sessionState !== null && selectors !== null) {
-    const activeSelectors = selectors;
-    const activeSessionState = sessionState;
+  // Shared mutable state for the session (populated by establishSession).
+  let sessionState: TranscriptSessionState | null = null;
+  let destroy: () => void = () => {};
+
+  // startDiscovery returns a destroy function that cleans up the observer and
+  // timeout.  It calls onSessionReady when the DOM becomes eligible, or calls
+  // onTimeout when the deadline expires with no eligible DOM.
+  function startDiscovery(
+    onSessionReady: (
+      resolvedSelectors: ReturnType<typeof resolveSelectors> & object,
+      resolvedScanResult: TranscriptScanResult,
+    ) => void,
+    onTimeout: () => void,
+  ): () => void {
+    const createMutationObserver =
+      dependencies.createMutationObserver ??
+      ((callback: MutationCallback) => new MutationObserver(callback));
+    const setTimeoutFn =
+      dependencies.setTimeout ?? window.setTimeout.bind(window);
+    const clearTimeoutFn =
+      dependencies.clearTimeout ?? window.clearTimeout.bind(window);
+
+    let done = false;
+
+    const cleanup = () => {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      observer.disconnect();
+      clearTimeoutFn(timeoutHandle);
+    };
+
+    const tryResolve = () => {
+      if (done) {
+        return;
+      }
+
+      const nextSelectors = resolveSelectors(dependencies.document);
+
+      if (nextSelectors === null) {
+        return;
+      }
+
+      const nextScanResult = scanTranscript(nextSelectors);
+
+      if (!nextScanResult.activationEligible) {
+        return;
+      }
+
+      cleanup();
+      onSessionReady(nextSelectors, nextScanResult);
+    };
+
+    const observationRoot =
+      dependencies.document.body ??
+      dependencies.document.documentElement ??
+      null;
+
+    const observer = createMutationObserver(() => {
+      tryResolve();
+    });
+
+    if (observationRoot instanceof Node) {
+      observer.observe(observationRoot, { childList: true, subtree: true });
+    }
+
+    const timeoutHandle = setTimeoutFn(() => {
+      if (done) {
+        return;
+      }
+
+      cleanup();
+      onTimeout();
+    }, STARTUP_DISCOVERY_TIMEOUT_MS);
+
+    return cleanup;
+  }
+
+  // Establishes the live virtualizer session given resolved selectors and scan
+  // result.  Updates the outer `sessionState` and `destroy` bindings.
+  function establishSession(
+    activeSelectors: NonNullable<ReturnType<typeof resolveSelectors>>,
+    activeScanResult: TranscriptScanResult,
+  ): TranscriptSessionState {
+    const activeSessionState = createTranscriptSessionState(
+      activeSelectors.scrollContainer,
+      activeScanResult,
+    );
+
     let appendObserverManager: ReturnType<
       typeof createAppendObserverManager
     > | null = null;
@@ -359,11 +450,60 @@ export function bootstrapContentScript(
     if (!sessionClosed) {
       connectObservers();
     }
+
+    return activeSessionState;
   }
 
-  dependencies.reportAvailability(
-    createReportContentAvailabilityMessage(availability),
-  );
+  if (
+    availability === "available" &&
+    selectors !== null &&
+    scanResult !== null
+  ) {
+    // DOM is ready and has enough bubbles — establish session immediately.
+    sessionState = establishSession(selectors, scanResult);
+    dependencies.reportAvailability(
+      createReportContentAvailabilityMessage("available"),
+    );
+  } else if (availability === "unavailable") {
+    // Selectors not found yet — enter discovery phase. Don't report anything
+    // until discovery succeeds or times out.
+    const stopDiscovery = startDiscovery(
+      (resolvedSelectors, resolvedScanResult) => {
+        sessionState = establishSession(resolvedSelectors, resolvedScanResult);
+        dependencies.reportAvailability(
+          createReportContentAvailabilityMessage("available"),
+        );
+      },
+      () => {
+        handleSelectorStartupFailure(dependencies.reportAvailability);
+      },
+    );
+
+    destroy = () => {
+      stopDiscovery();
+    };
+  } else {
+    // availability === "inactive": selectors found but < 50 bubbles.
+    // Report inactive immediately, and also watch for more bubbles to arrive.
+    dependencies.reportAvailability(
+      createReportContentAvailabilityMessage("inactive"),
+    );
+
+    const stopDiscovery = startDiscovery(
+      (resolvedSelectors, resolvedScanResult) => {
+        sessionState = establishSession(resolvedSelectors, resolvedScanResult);
+        dependencies.reportAvailability(
+          createReportContentAvailabilityMessage("available"),
+        );
+      },
+      // Timeout in the inactive case is a no-op: "inactive" was already reported.
+      () => {},
+    );
+
+    destroy = () => {
+      stopDiscovery();
+    };
+  }
 
   return { availability, destroy, scanResult, sessionState };
 }
