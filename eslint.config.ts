@@ -13,5 +13,5 @@ export default defineConfig([
   },
   tseslint.configs.recommended,
   eslintConfigPrettier,
-  globalIgnores(["dist/"]),
+  globalIgnores(["dist/", ".worktrees"]),
 ]);

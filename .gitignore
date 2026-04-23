@@ -31,5 +31,5 @@ settings.local.json
 /playwright/.cache/
 /playwright/.auth/
 
-# Codex temporary memory files
-.codex-memory-*.md
+.pnpm-store
+.worktrees
