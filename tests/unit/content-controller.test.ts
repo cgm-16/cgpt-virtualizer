@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { handleContentMessage } from "../../src/background/content-controller.ts";
-import { createTabStateStore } from "../../src/background/tab-state.ts";
+import {
+  createInMemoryStorage,
+  createTabStateStore,
+} from "../../src/background/tab-state.ts";
 import {
   DISABLE_TAB_VIRTUALIZATION_MESSAGE_TYPE,
   GET_TAB_ENABLED_MESSAGE_TYPE,
@@ -58,7 +61,7 @@ describe("content-worker message contracts", () => {
 
 describe("handleContentMessage", () => {
   it("content availability 보고를 tab state에 반영한다", async () => {
-    const store = createTabStateStore();
+    const store = createTabStateStore(createInMemoryStorage());
 
     await expect(
       handleContentMessage(
@@ -71,11 +74,12 @@ describe("handleContentMessage", () => {
       ),
     ).resolves.toBeNull();
 
-    expect(store.getTabAvailability(7)).toBe("available");
+    await expect(store.getTabAvailability(7)).resolves.toBe("available");
   });
 
   it("sender tab의 enabled 상태를 응답한다", async () => {
-    const store = createTabStateStore([[7, true]]);
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabPreference(7, true);
 
     await expect(
       handleContentMessage(createGetTabEnabledMessage(), 7, {
@@ -86,7 +90,8 @@ describe("handleContentMessage", () => {
   });
 
   it("memory guard 요청이 오면 sender tab을 끄고 refresh한다", async () => {
-    const store = createTabStateStore([[7, true]]);
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabPreference(7, true);
     const refreshTab = vi.fn(async () => {});
 
     await expect(
@@ -96,12 +101,13 @@ describe("handleContentMessage", () => {
       }),
     ).resolves.toBeNull();
 
-    expect(store.getTabPreference(7)).toBe(false);
+    await expect(store.getTabPreference(7)).resolves.toBe(false);
     expect(refreshTab).toHaveBeenCalledWith(7);
   });
 
   it("sender tab id가 없으면 disable 요청을 무시한다", async () => {
-    const store = createTabStateStore([[7, true]]);
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabPreference(7, true);
     const refreshTab = vi.fn(async () => {});
 
     await expect(
@@ -111,7 +117,7 @@ describe("handleContentMessage", () => {
       }),
     ).resolves.toBeNull();
 
-    expect(store.getTabPreference(7)).toBe(true);
+    await expect(store.getTabPreference(7)).resolves.toBe(true);
     expect(refreshTab).not.toHaveBeenCalled();
   });
 });

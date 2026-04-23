@@ -37,8 +37,18 @@ interface ChromeTabsApi {
   reload(tabId: number, callback?: () => void): void;
 }
 
+interface ChromeStorageArea {
+  get(key: string): Promise<Record<string, unknown>>;
+  set(items: Record<string, unknown>): Promise<void>;
+}
+
+interface ChromeStorageApi {
+  session: ChromeStorageArea;
+}
+
 interface ChromeApi {
   runtime: ChromeRuntimeApi;
+  storage: ChromeStorageApi;
   tabs: ChromeTabsApi;
 }
 

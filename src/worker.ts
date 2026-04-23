@@ -4,9 +4,19 @@ import {
 } from "./shared/messages.ts";
 import { handleContentMessage } from "./background/content-controller.ts";
 import { handlePopupMessage } from "./background/popup-controller.ts";
-import { createTabStateStore } from "./background/tab-state.ts";
+import { createTabStateStore, type StorageBackend } from "./background/tab-state.ts";
 
-const tabStateStore = createTabStateStore();
+const sessionStorage: StorageBackend = {
+  async get(key) {
+    const result = await chrome.storage.session.get(key);
+    return result[key];
+  },
+  async set(key, value) {
+    await chrome.storage.session.set({ [key]: value });
+  },
+};
+
+const tabStateStore = createTabStateStore(sessionStorage);
 
 chrome.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse) => {
