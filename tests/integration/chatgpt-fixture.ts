@@ -116,7 +116,9 @@ export async function expectInitialMountedWindow(page: Page): Promise<void> {
     });
 }
 
-async function installFixtureRoutes(context: BrowserContext): Promise<void> {
+export async function installFixtureRoutes(
+  context: BrowserContext,
+): Promise<void> {
   await context.route(`${CHATGPT_BASE_URL}/**`, async (route) => {
     const url = new URL(route.request().url());
 
