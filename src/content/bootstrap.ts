@@ -184,6 +184,9 @@ export function bootstrapContentScript(
     if (observationRoot instanceof Node) {
       observer.observe(observationRoot, { childList: true, subtree: true });
     }
+    // If observationRoot is null (both body and documentElement are absent),
+    // the observer is never attached and discovery relies solely on the timeout
+    // to report failure.
 
     const timeoutHandle = setTimeoutFn(() => {
       if (done) {
@@ -198,7 +201,8 @@ export function bootstrapContentScript(
   }
 
   // Establishes the live virtualizer session given resolved selectors and scan
-  // result.  Updates the outer `sessionState` and `destroy` bindings.
+  // result.  Returns the new session state; also mutates the outer `destroy`
+  // binding as a side-effect so callers can later tear down the session.
   function establishSession(
     activeSelectors: NonNullable<ReturnType<typeof resolveSelectors>>,
     activeScanResult: TranscriptScanResult,
@@ -479,9 +483,7 @@ export function bootstrapContentScript(
       },
     );
 
-    destroy = () => {
-      stopDiscovery();
-    };
+    destroy = stopDiscovery;
   } else {
     // availability === "inactive": selectors found but < 50 bubbles.
     // Report inactive immediately, and also watch for more bubbles to arrive.
@@ -500,9 +502,7 @@ export function bootstrapContentScript(
       () => {},
     );
 
-    destroy = () => {
-      stopDiscovery();
-    };
+    destroy = stopDiscovery;
   }
 
   return { availability, destroy, scanResult, sessionState };
