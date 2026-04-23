@@ -16,6 +16,7 @@ import {
 } from "../../src/shared/messages.ts";
 import { handlePopupMessage } from "../../src/background/popup-controller.ts";
 import {
+  createInMemoryStorage,
   createPopupState,
   createTabStateStore,
 } from "../../src/background/tab-state.ts";
@@ -120,37 +121,29 @@ describe("popup-worker message contracts", () => {
 });
 
 describe("tab state store", () => {
-  it("defaults unseen tabs to off", () => {
-    const store = createTabStateStore();
+  it("defaults unseen tabs to off", async () => {
+    const store = createTabStateStore(createInMemoryStorage());
 
-    expect(store.getTabPreference(7)).toBe(false);
+    await expect(store.getTabPreference(7)).resolves.toBe(false);
     expect(
-      createPopupState(
-        7,
-        store.getTabPreference(7),
-        store.getTabAvailability(7),
-      ),
+      createPopupState(7, false, "idle"),
     ).toEqual({
       enabled: false,
       status: "Off",
     });
   });
 
-  it("stores preferences by tab id", () => {
-    const store = createTabStateStore();
+  it("stores preferences by tab id", async () => {
+    const store = createTabStateStore(createInMemoryStorage());
 
-    store.setTabPreference(7, true);
-    store.setTabPreference(9, false);
-    store.setTabAvailability(7, "available");
+    await store.setTabPreference(7, true);
+    await store.setTabPreference(9, false);
+    await store.setTabAvailability(7, "available");
 
-    expect(store.getTabPreference(7)).toBe(true);
-    expect(store.getTabPreference(9)).toBe(false);
+    await expect(store.getTabPreference(7)).resolves.toBe(true);
+    await expect(store.getTabPreference(9)).resolves.toBe(false);
     expect(
-      createPopupState(
-        7,
-        store.getTabPreference(7),
-        store.getTabAvailability(7),
-      ),
+      createPopupState(7, true, "available"),
     ).toEqual({
       enabled: true,
       status: "On",
@@ -188,7 +181,7 @@ describe("tab state store", () => {
 
 describe("popup controller", () => {
   it("returns off for an active tab with no stored preference", async () => {
-    const store = createTabStateStore();
+    const store = createTabStateStore(createInMemoryStorage());
 
     await expect(
       handlePopupMessage(createGetPopupStateMessage(), {
@@ -205,8 +198,8 @@ describe("popup controller", () => {
 
   it("stores the updated preference and refreshes the active tab", async () => {
     const refreshedTabIds: number[] = [];
-    const store = createTabStateStore();
-    store.setTabAvailability(7, "available");
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabAvailability(7, "available");
 
     await expect(
       handlePopupMessage(createSetTabEnabledMessage(true), {
@@ -222,13 +215,14 @@ describe("popup controller", () => {
       type: POPUP_STATE_MESSAGE_TYPE,
     });
 
-    expect(store.getTabPreference(7)).toBe(true);
+    await expect(store.getTabPreference(7)).resolves.toBe(true);
     expect(refreshedTabIds).toEqual([7]);
   });
 
   it("returns unavailable without mutating state when there is no active tab", async () => {
     const refreshedTabIds: number[] = [];
-    const store = createTabStateStore([[7, true]]);
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabPreference(7, true);
 
     await expect(
       handlePopupMessage(createSetTabEnabledMessage(false), {
@@ -244,13 +238,14 @@ describe("popup controller", () => {
       type: POPUP_STATE_MESSAGE_TYPE,
     });
 
-    expect(store.getTabPreference(7)).toBe(true);
+    await expect(store.getTabPreference(7)).resolves.toBe(true);
     expect(refreshedTabIds).toEqual([]);
   });
 
   it("returns unavailable when the active transcript page reports selector failure", async () => {
-    const store = createTabStateStore([[7, true]]);
-    store.setTabAvailability(7, "unavailable");
+    const store = createTabStateStore(createInMemoryStorage());
+    await store.setTabPreference(7, true);
+    await store.setTabAvailability(7, "unavailable");
 
     await expect(
       handlePopupMessage(createGetPopupStateMessage(), {
@@ -268,10 +263,10 @@ describe("popup controller", () => {
 
 describe("toggle flow regression", () => {
   it("활성 탭 on/off 토글이 content startup gating까지 일관되게 반영된다", async () => {
-    const store = createTabStateStore();
+    const store = createTabStateStore(createInMemoryStorage());
     const refreshedTabIds: number[] = [];
 
-    store.setTabAvailability(7, "available");
+    await store.setTabAvailability(7, "available");
 
     const getCurrentTabVirtualizationEnabled = async () => {
       const response = await handleContentMessage(

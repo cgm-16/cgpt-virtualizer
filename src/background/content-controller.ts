@@ -13,39 +13,38 @@ export interface ContentControllerDependencies {
   tabStateStore: TabStateStore;
 }
 
-export function handleContentMessage(
+export async function handleContentMessage(
   message: ContentToWorkerMessage,
   senderTabId: number | null,
   dependencies: ContentControllerDependencies,
 ): Promise<WorkerToContentMessage | null> {
   if (message.type === REPORT_CONTENT_AVAILABILITY_MESSAGE_TYPE) {
     if (typeof senderTabId === "number") {
-      dependencies.tabStateStore.setTabAvailability(
+      await dependencies.tabStateStore.setTabAvailability(
         senderTabId,
         message.availability,
       );
     }
 
-    return Promise.resolve(null);
+    return null;
   }
 
   if (message.type === GET_TAB_ENABLED_MESSAGE_TYPE) {
-    return Promise.resolve(
-      createTabEnabledMessage(
-        typeof senderTabId === "number" &&
-          dependencies.tabStateStore.getTabPreference(senderTabId),
-      ),
-    );
+    const enabled =
+      typeof senderTabId === "number" &&
+      (await dependencies.tabStateStore.getTabPreference(senderTabId));
+    return createTabEnabledMessage(enabled);
   }
 
   if (
     message.type !== DISABLE_TAB_VIRTUALIZATION_MESSAGE_TYPE ||
     typeof senderTabId !== "number"
   ) {
-    return Promise.resolve(null);
+    return null;
   }
 
-  dependencies.tabStateStore.setTabPreference(senderTabId, false);
+  await dependencies.tabStateStore.setTabPreference(senderTabId, false);
 
-  return dependencies.refreshTab(senderTabId).then(() => null);
+  await dependencies.refreshTab(senderTabId);
+  return null;
 }
