@@ -478,7 +478,7 @@ describe("startup discovery phase", () => {
     return { scrollContainer, transcriptRoot, bubbles };
   }
 
-  it("selector miss → DOM appears before timeout → session created without reporting Unavailable", () => {
+  it("selector miss → DOM appears before timeout → reports unavailable first, then available", () => {
     const reports: unknown[] = [];
     const mutationObservers: MockMutationObserverEntry[] = [];
     const timeouts: Array<{ callback: () => void; delay: number }> = [];
@@ -500,8 +500,12 @@ describe("startup discovery phase", () => {
       clearTimeout: vi.fn(),
     });
 
-    // Nothing reported yet — discovery in progress
-    expect(reports).toHaveLength(0);
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+    ]);
     expect(result.availability).toBe("unavailable");
 
     // Simulate DOM becoming ready
@@ -515,10 +519,53 @@ describe("startup discovery phase", () => {
     // Session should now be established and "available" reported
     expect(reports).toEqual([
       {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+      {
         availability: "available",
         type: "runtime/report-content-availability",
       },
     ]);
+  });
+
+  it("selector miss → DOM becomes eligible while discovery observer is attaching → session starts immediately", () => {
+    const reports: unknown[] = [];
+    const timeouts: Array<{ callback: () => void; delay: number }> = [];
+    const doc = makeEmptyDoc();
+
+    const result = bootstrapContentScript({
+      createMutationObserver() {
+        return {
+          disconnect() {},
+          observe() {
+            addSelectorsAndBubbles(doc, 50);
+          },
+          takeRecords() {
+            return [];
+          },
+        };
+      },
+      createResizeObserver: createNoopResizeObserver,
+      document: doc,
+      pathname: "/c/example",
+      reportAvailability(message) {
+        reports.push(message);
+      },
+      setTimeout(callback, delay) {
+        timeouts.push({ callback, delay });
+        return timeouts.length;
+      },
+      clearTimeout: vi.fn(),
+    });
+
+    expect(reports).toEqual([
+      {
+        availability: "available",
+        type: "runtime/report-content-availability",
+      },
+    ]);
+    expect(result.sessionState).not.toBeNull();
   });
 
   it("selector miss → timeout fires before DOM appears → Unavailable reported", () => {
@@ -543,7 +590,12 @@ describe("startup discovery phase", () => {
       clearTimeout: vi.fn(),
     });
 
-    expect(reports).toHaveLength(0);
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+    ]);
     expect(timeouts).toHaveLength(1);
     expect(timeouts[0]?.delay).toBe(DISCOVERY_TIMEOUT_MS);
 
@@ -555,6 +607,51 @@ describe("startup discovery phase", () => {
         availability: "unavailable",
         type: "runtime/report-content-availability",
       },
+    ]);
+  });
+
+  it("selector miss → delayed short transcript reports inactive and never degrades to Unavailable", () => {
+    const reports: unknown[] = [];
+    const mutationObservers: MockMutationObserverEntry[] = [];
+    const timeouts: Array<{ callback: () => void; delay: number }> = [];
+    const doc = makeEmptyDoc();
+
+    bootstrapContentScript({
+      createMutationObserver:
+        createMockMutationObserverFactory(mutationObservers),
+      createResizeObserver: createNoopResizeObserver,
+      document: doc,
+      pathname: "/c/example",
+      reportAvailability(message) {
+        reports.push(message);
+      },
+      setTimeout(callback, delay) {
+        timeouts.push({ callback, delay });
+        return timeouts.length;
+      },
+      clearTimeout: vi.fn(),
+    });
+
+    addSelectorsAndBubbles(doc, 49);
+
+    mutationObservers[0]?.callback([], {} as MutationObserver);
+
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+      { availability: "inactive", type: "runtime/report-content-availability" },
+    ]);
+
+    timeouts[0]?.callback();
+
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+      { availability: "inactive", type: "runtime/report-content-availability" },
     ]);
   });
 
@@ -643,7 +740,12 @@ describe("startup discovery phase", () => {
       },
     });
 
-    expect(reports).toHaveLength(0);
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+    ]);
     expect(mutationObservers).toHaveLength(1);
 
     result.destroy();
@@ -652,12 +754,138 @@ describe("startup discovery phase", () => {
     expect(mutationObservers[0]?.disconnect).toHaveBeenCalledTimes(1);
     // Timeout should be cleared
     expect(clearedTimeouts).toHaveLength(1);
-    // No Unavailable should have been reported
-    expect(reports).toHaveLength(0);
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+    ]);
 
-    // Firing the timeout after destroy should not report anything
+    // Firing the timeout after destroy should not report anything else
     timeouts[0]?.callback();
-    expect(reports).toHaveLength(0);
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+    ]);
+  });
+
+  it("destroy() after delayed activation tears down the established session", () => {
+    const mutationObservers: MockMutationObserverEntry[] = [];
+    const timeouts: Array<{ callback: () => void; delay: number }> = [];
+    const doc = makeEmptyDoc();
+
+    const result = bootstrapContentScript({
+      createMutationObserver:
+        createMockMutationObserverFactory(mutationObservers),
+      createResizeObserver: createNoopResizeObserver,
+      document: doc,
+      pathname: "/c/example",
+      reportAvailability() {},
+      requestAnimationFrame(callback) {
+        callback(0);
+        return 1;
+      },
+      setTimeout(callback, delay) {
+        timeouts.push({ callback, delay });
+        return timeouts.length;
+      },
+      clearTimeout: vi.fn(),
+    });
+
+    const { transcriptRoot } = addSelectorsAndBubbles(doc, 50);
+
+    mutationObservers[0]?.callback([], {} as MutationObserver);
+
+    expect(
+      transcriptRoot.querySelector("[data-cgpt-top-spacer]"),
+    ).not.toBeNull();
+    expect(
+      transcriptRoot.querySelector("[data-cgpt-bottom-spacer]"),
+    ).not.toBeNull();
+
+    result.destroy();
+
+    expect(transcriptRoot.querySelector("[data-cgpt-top-spacer]")).toBeNull();
+    expect(
+      transcriptRoot.querySelector("[data-cgpt-bottom-spacer]"),
+    ).toBeNull();
+    expect(
+      transcriptRoot.querySelectorAll("[data-cgpt-transcript-bubble]"),
+    ).toHaveLength(50);
+  });
+
+  it("selector miss → attribute-only selector activation is observed during discovery", () => {
+    const reports: unknown[] = [];
+    const mutationObservers: MockMutationObserverEntry[] = [];
+    const timeouts: Array<{ callback: () => void; delay: number }> = [];
+    const fixture = makePendingSelectorDoc(50);
+
+    bootstrapContentScript({
+      createMutationObserver:
+        createMockMutationObserverFactory(mutationObservers),
+      createResizeObserver: createNoopResizeObserver,
+      document: fixture.document,
+      pathname: "/c/example",
+      reportAvailability(message) {
+        reports.push(message);
+      },
+      setTimeout(callback, delay) {
+        timeouts.push({ callback, delay });
+        return timeouts.length;
+      },
+      clearTimeout: vi.fn(),
+    });
+
+    expect(mutationObservers[0]?.observe).toHaveBeenCalledWith(
+      document.body,
+      expect.objectContaining({
+        attributeFilter: [
+          "data-cgpt-transcript-bubble",
+          "data-cgpt-scroll-container",
+          "data-cgpt-transcript-root",
+        ],
+        attributes: true,
+        childList: true,
+        subtree: true,
+      }),
+    );
+
+    fixture.scrollContainer.setAttribute("data-cgpt-scroll-container", "");
+    fixture.transcriptRoot.setAttribute("data-cgpt-transcript-root", "");
+    for (const bubble of fixture.bubbles) {
+      bubble.setAttribute("data-cgpt-transcript-bubble", "");
+    }
+
+    mutationObservers[0]?.callback(
+      [
+        makeAttributesMutationRecord(
+          fixture.scrollContainer,
+          "data-cgpt-scroll-container",
+        ),
+        makeAttributesMutationRecord(
+          fixture.transcriptRoot,
+          "data-cgpt-transcript-root",
+        ),
+        makeAttributesMutationRecord(
+          fixture.bubbles[0] as HTMLElement,
+          "data-cgpt-transcript-bubble",
+        ),
+      ],
+      {} as MutationObserver,
+    );
+
+    expect(reports).toEqual([
+      {
+        availability: "unavailable",
+        type: "runtime/report-content-availability",
+      },
+      {
+        availability: "available",
+        type: "runtime/report-content-availability",
+      },
+    ]);
   });
 });
 
@@ -804,4 +1032,58 @@ function makeChildListMutationRecord(
     target,
     type: "childList",
   } as MutationRecord;
+}
+
+function makeAttributesMutationRecord(
+  target: Node,
+  attributeName: string,
+): MutationRecord {
+  return {
+    addedNodes: [] as unknown as NodeList,
+    attributeName,
+    attributeNamespace: null,
+    nextSibling: null,
+    oldValue: null,
+    previousSibling: null,
+    removedNodes: [] as unknown as NodeList,
+    target,
+    type: "attributes",
+  } as MutationRecord;
+}
+
+function makePendingSelectorDoc(bubbleCount: number): {
+  bubbles: HTMLElement[];
+  document: Document;
+  scrollContainer: HTMLElement;
+  transcriptRoot: HTMLElement;
+} {
+  document.body.innerHTML = "";
+
+  const scrollContainer = document.createElement("main");
+  Object.defineProperty(scrollContainer, "clientHeight", {
+    configurable: true,
+    value: 200,
+  });
+  const transcriptRoot = document.createElement("section");
+  const streamingIndicator = document.createElement("div");
+  streamingIndicator.setAttribute("data-cgpt-streaming-indicator", "");
+  streamingIndicator.setAttribute("hidden", "");
+  const bubbles: HTMLElement[] = [];
+
+  for (let i = 0; i < bubbleCount; i++) {
+    const bubble = document.createElement("article");
+    bubble.getBoundingClientRect = () => ({ height: 100 }) as DOMRect;
+    transcriptRoot.append(bubble);
+    bubbles.push(bubble);
+  }
+
+  scrollContainer.append(transcriptRoot);
+  document.body.append(scrollContainer, streamingIndicator);
+
+  return {
+    bubbles,
+    document,
+    scrollContainer,
+    transcriptRoot,
+  };
 }
