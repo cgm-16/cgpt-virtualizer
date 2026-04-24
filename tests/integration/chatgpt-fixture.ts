@@ -150,6 +150,7 @@ function renderFixtureHtml(requestPath: string): string {
     "bubble-50": renderFixtureBody("bubble-50"),
     "bubble-2501": renderFixtureBody("bubble-2501"),
     "bubble-50-alt": renderFixtureBody("bubble-50-alt"),
+    "pending-selectors-50": renderFixtureBody("pending-selectors-50"),
     missing: renderFixtureBody("missing"),
   };
 
@@ -222,6 +223,17 @@ function renderFixtureBody(fixture: string | null): string {
       <main data-cgpt-scroll-container style="height: 200px; overflow-y: auto;">
         <section data-cgpt-transcript-root>
           ${renderBubbles(count, labelPrefix)}
+        </section>
+        <div data-cgpt-streaming-indicator hidden></div>
+      </main>
+    `;
+  }
+
+  if (fixture === "pending-selectors-50") {
+    return `
+      <main style="height: 200px; overflow-y: auto;">
+        <section>
+          ${renderBubbles(50)}
         </section>
         <div data-cgpt-streaming-indicator hidden></div>
       </main>
