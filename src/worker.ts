@@ -4,7 +4,10 @@ import {
 } from "./shared/messages.ts";
 import { handleContentMessage } from "./background/content-controller.ts";
 import { handlePopupMessage } from "./background/popup-controller.ts";
-import { createTabStateStore, type StorageBackend } from "./background/tab-state.ts";
+import {
+  createTabStateStore,
+  type StorageBackend,
+} from "./background/tab-state.ts";
 
 const sessionStorage: StorageBackend = {
   async get(key) {
