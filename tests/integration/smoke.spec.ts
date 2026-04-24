@@ -10,7 +10,11 @@
  *   - Full virtualization behavior — see content-bootstrap.spec.ts for that
  */
 import { test, expect } from "./extension-fixture.ts";
-import { installFixtureRoutes } from "./chatgpt-fixture.ts";
+import {
+  clickPopupToggle,
+  expectPopupState,
+  installFixtureRoutes,
+} from "./chatgpt-fixture.ts";
 
 test("통합 테스트 하네스가 실제 확장을 로드한다", async ({
   extensionId,
@@ -42,8 +46,12 @@ test("팝업 토글 클릭이 실제 UI를 통해 활성화 상태를 변경한�
   await expect(popupPage.locator("#toggle:not([disabled])")).toBeVisible();
   await expect(popupPage.locator("#status-line")).toHaveText("Off");
 
-  await popupPage.locator("#toggle").click();
+  await clickPopupToggle(popupPage);
 
-  // After the click, the toggle should be checked (enabled=true stored in background)
+  // The toggle must enable the active ChatGPT tab, not just the popup tab itself.
+  await expectPopupState(popupPage, {
+    enabled: true,
+    status: "On",
+  });
   await expect(popupPage.locator("#toggle")).toBeChecked();
 });

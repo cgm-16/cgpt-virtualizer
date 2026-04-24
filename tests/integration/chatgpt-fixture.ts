@@ -44,18 +44,8 @@ async function setExtensionEnabled(
   helperPage: Page,
   enabled: boolean,
 ): Promise<void> {
+  await activateChatGptTab(helperPage);
   await helperPage.evaluate(async (nextEnabled) => {
-    const tabs = await chrome.tabs.query({
-      url: ["https://chatgpt.com/*"],
-    });
-    const targetTabId = tabs[0]?.id;
-
-    if (typeof targetTabId !== "number") {
-      throw new Error("활성화할 ChatGPT 탭을 찾을 수 없습니다.");
-    }
-
-    await chrome.tabs.update(targetTabId, { active: true });
-
     await new Promise((resolve) => {
       chrome.runtime.sendMessage(
         {
@@ -69,20 +59,40 @@ async function setExtensionEnabled(
 }
 
 async function getPopupState(helperPage: Page): Promise<PopupState> {
+  await activateChatGptTab(helperPage);
   return helperPage.evaluate(async () => {
+    return await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: "runtime/get-popup-state" }, resolve);
+    });
+  }) as Promise<PopupState>;
+}
+
+async function activateChatGptTab(helperPage: Page): Promise<void> {
+  await helperPage.evaluate(async () => {
     const tabs = await chrome.tabs.query({
       url: ["https://chatgpt.com/*"],
     });
     const targetTabId = tabs[0]?.id;
 
-    if (typeof targetTabId === "number") {
-      await chrome.tabs.update(targetTabId, { active: true });
+    if (typeof targetTabId !== "number") {
+      throw new Error("활성화할 ChatGPT 탭을 찾을 수 없습니다.");
     }
 
-    return await new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "runtime/get-popup-state" }, resolve);
-    });
-  }) as Promise<PopupState>;
+    await chrome.tabs.update(targetTabId, { active: true });
+  });
+}
+
+export async function clickPopupToggle(helperPage: Page): Promise<void> {
+  await activateChatGptTab(helperPage);
+  await helperPage.evaluate(() => {
+    const toggleElement = document.querySelector<HTMLInputElement>("#toggle");
+
+    if (toggleElement === null) {
+      throw new Error("팝업 토글 요소를 찾을 수 없습니다.");
+    }
+
+    toggleElement.click();
+  });
 }
 
 export async function expectPopupState(
