@@ -36,7 +36,11 @@ import {
   applyPendingAnchorCorrection,
   initializeScrollVirtualization,
 } from "./scroll.ts";
-import { CONTENT_SELECTOR_REGISTRY, resolveSelectors } from "./selectors.ts";
+import {
+  CONTENT_SELECTOR_REGISTRY,
+  normalizeCandidates,
+  resolveSelectors,
+} from "./selectors.ts";
 import {
   buildBubbleRecords,
   markAllRecordsMounted,
@@ -52,13 +56,13 @@ import {
 } from "./transcript-scan.ts";
 
 const SELECTOR_FAILURE_ATTRIBUTE_FILTER = collectObservedSelectorAttributes([
-  CONTENT_SELECTOR_REGISTRY.scrollContainer,
-  CONTENT_SELECTOR_REGISTRY.transcriptRoot,
+  ...normalizeCandidates(CONTENT_SELECTOR_REGISTRY.scrollContainer),
+  ...normalizeCandidates(CONTENT_SELECTOR_REGISTRY.transcriptRoot),
 ]);
 const STARTUP_DISCOVERY_ATTRIBUTE_FILTER = collectObservedSelectorAttributes([
-  CONTENT_SELECTOR_REGISTRY.bubble,
-  CONTENT_SELECTOR_REGISTRY.scrollContainer,
-  CONTENT_SELECTOR_REGISTRY.transcriptRoot,
+  ...normalizeCandidates(CONTENT_SELECTOR_REGISTRY.bubble),
+  ...normalizeCandidates(CONTENT_SELECTOR_REGISTRY.scrollContainer),
+  ...normalizeCandidates(CONTENT_SELECTOR_REGISTRY.transcriptRoot),
 ]);
 
 const STARTUP_DISCOVERY_TIMEOUT_MS = 10_000;

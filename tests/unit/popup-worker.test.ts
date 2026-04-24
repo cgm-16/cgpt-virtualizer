@@ -125,9 +125,7 @@ describe("tab state store", () => {
     const store = createTabStateStore(createInMemoryStorage());
 
     await expect(store.getTabPreference(7)).resolves.toBe(false);
-    expect(
-      createPopupState(7, false, "idle"),
-    ).toEqual({
+    expect(createPopupState(7, false, "idle")).toEqual({
       enabled: false,
       status: "Off",
     });
@@ -142,9 +140,7 @@ describe("tab state store", () => {
 
     await expect(store.getTabPreference(7)).resolves.toBe(true);
     await expect(store.getTabPreference(9)).resolves.toBe(false);
-    expect(
-      createPopupState(7, true, "available"),
-    ).toEqual({
+    expect(createPopupState(7, true, "available")).toEqual({
       enabled: true,
       status: "On",
     });
